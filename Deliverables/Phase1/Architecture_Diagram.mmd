@@ -1,0 +1,36 @@
+flowchart TD
+    classDef comp fill:#7cd1f9,stroke:#333,stroke-width:1px,color:#000
+    classDef store fill:#b3e5fc,stroke:#333,stroke-width:1px,color:#000
+    classDef note fill:#fdf1b8,stroke:#a67c00,stroke-width:1px,color:#000,stroke-dasharray: 5 5
+
+    subgraph ClientZone ["web-browser"]
+        Client["«component»<br/>REST Client (Browser / App)"]
+    end
+
+    subgraph AppZone ["«execution environment»"]
+        API["«component»<br/>Spring Boot Application"]
+    end
+
+    subgraph DBZone ["«execution environment»"]
+        DB[("«component»<br/>PostgreSQL")]
+    end
+
+    subgraph OSZone ["«execution environment»"]
+        Disk[("«component»<br/>Physical File System")]
+    end
+
+    ClientZone-- "HTTPS" --> AppZone
+    AppZone -- "JDBC" --> DBZone
+    AppZone -- "Java NIO (OS I/O)" --> OSZone
+
+    NoteAPI["Handles logic, authorization<br/>and executes OS-level actions."]
+    NoteDB["Stores metadata,<br/>UUIDs and User Roles."]
+    NoteDisk["Stores binary files<br/>named using generated UUIDs<br/>to prevent Path Traversal."]
+
+    API -.- NoteAPI
+    DB -.- NoteDB
+    Disk -.- NoteDisk
+
+    class Client,API comp
+    class DB,Disk store
+    class NoteAPI,NoteDB,NoteDisk note

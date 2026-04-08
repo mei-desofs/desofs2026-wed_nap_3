@@ -1,0 +1,81 @@
+classDiagram
+    direction LR
+
+    class Role {
+        <<enumeration>>
+        OWNER
+        EDITOR
+        VIEWER
+    }
+
+    class ResourceType {
+        <<enumeration>>
+        FILE
+        FOLDER
+    }
+
+    class User {
+        <<Aggregate Root>>
+        +UUID UserId
+        +String Username
+        +String Email
+        -String PasswordHash
+        +Long StorageQuota
+        +Boolean IsLocked
+    }
+
+    class AccessShare {
+        <<Aggregate Root>>
+        +UUID ShareId
+        +UUID ResourceId
+        +ResourceType Type
+        +UUID GrantedToUserId
+        +Role RoleType
+    }
+
+    class Folder {
+        <<Aggregate Root>>
+        +UUID FolderId
+        +String FolderName
+        +UUID OwnerId
+        +UUID ParentFolderId
+    }
+
+    class File {
+        <<Aggregate Root>>
+        +UUID FileId
+        +String FileName
+        +UUID FolderId
+        +UUID OwnerId
+        +Boolean IsDeleted
+    }
+
+    class FileVersion {
+        <<Aggregate Root>>
+        +UUID VersionId
+        +UUID FileId
+        +String PhysicalOsPath
+        +Long Size
+        +String MimeType
+        +String FileHash
+        +DateTime UploadedAt
+    }
+
+    %% Notas de Arquitetura de Segurança
+    note for FileVersion "Fulfills SSDLC: 'Repair the damage'.<br/>FileHash ensures integrity."
+    note for AccessShare "Enforces RBAC / Least Privilege.<br/>Evaluated before any OS-level I/O."
+    note for File "Soft delete mechanism prevents<br/>immediate data loss."
+
+    %% 1. Fluxo Principal de Dados (Linha reta esquerda -> direita)
+    User "1" --> "*" Folder : owns
+    Folder "1" *-- "*" File : contains
+    File "1" *-- "1..*" FileVersion : maintains history
+
+    %% 2. Fluxo de Autorização
+    User "1" --> "*" AccessShare : granted to
+    AccessShare "*" ..> "1" Folder : secures
+    AccessShare "*" ..> "1" File : secures
+
+    %% 3. Associação dos Enums à classe onde são utilizados
+    AccessShare ..> Role : uses
+    AccessShare ..> ResourceType : uses
