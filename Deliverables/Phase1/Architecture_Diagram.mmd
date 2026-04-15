@@ -11,6 +11,10 @@ flowchart TD
         API["«component»<br/>Spring Boot Application"]
     end
 
+    subgraph ELKZone ["«execution environment»"]
+        ELK[("«component»<br/>External logging store")]
+    end
+
     subgraph DBZone ["«execution environment»"]
         DB[("«component»<br/>PostgreSQL")]
     end
@@ -22,6 +26,7 @@ flowchart TD
     ClientZone-- "HTTPS" --> AppZone
     AppZone -- "JDBC" --> DBZone
     AppZone -- "Java NIO (OS I/O)" --> OSZone
+    AppZone -- "Logs/metrics" --> ELKZone
 
     NoteAPI["Handles logic, authorization<br/>and executes OS-level actions."]
     NoteDB["Stores metadata,<br/>UUIDs and User Roles."]
@@ -32,5 +37,5 @@ flowchart TD
     Disk -.- NoteDisk
 
     class Client,API comp
-    class DB,Disk store
+    class DB,Disk,ELK store
     class NoteAPI,NoteDB,NoteDisk note

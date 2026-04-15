@@ -1,18 +1,20 @@
-# System Overview & High-Level Architecture
+# System Overview
 
-## System Overview
-**Ender Chest** is a Secure File Management System developed in Java (Spring Boot). The main goal of the system is not functional complexity, but rather resilience against attacks and the strict implementation of SSDLC practices.
+## 1. Purpose and Scope
+Ender Chest is a secure file management system that allows users to upload, download, organize, and share files and folders through a REST API. The system must execute OS-level actions (directory creation and file I/O) triggered by user requests, therefore secure design and authorization boundaries are central to the architecture.
 
-As per the project requirements, the system executes direct operations on the server's Operating System (directory creation, reading, and writing of binary files). **These operations are strictly triggered by user inputs** (upload, download, and folder creation requests via the API).
+## 2. Physical Architecture (Deployment View)
+This diagram shows the physical deployment: a REST client communicating with a Spring Boot backend over HTTPS. The backend persists metadata and access control information in PostgreSQL and stores binary content on the host file system. OS-level actions are executed by the backend using Java NIO.
 
-To address scenarios of successful exploitation, the system relies on a strong damage mitigation strategy:
-1. **Detection:** Implementation of an immutable Audit Logging system that records who accessed, modified, or shared resources.
-2. **Damage Reduction:** Enforcement of the *Least Privilege* principle (Role-Based Access Control with Owner, Editor, and Viewer roles). This ensures that a compromised user only affects their own scope (using logical *chroot* confinement to prevent *Path Traversal*).
-3. **Repair:** Preservation of secure states that allow for the recovery of corrupted or lost data (e.g., soft deletes or versioning).
+![Physical Architecture Diagram](./assets/architecture_diagram.png)
 
-## High-Level Architecture
-The architecture follows a secure Client-Server model:
-* **Presentation Layer (Client):** Consumes the REST API strictly via HTTPS/TLS to prevent data interception (*Man-in-the-Middle* attacks).
-* **API Gateway / Security Layer:** Inspects all user input. Validates JWT tokens, sanitizes file paths, and applies *Rate Limiting*.
-* **Application Layer (Spring Boot):** Business logic is strictly encapsulated using *Domain-Driven Design* (DDD) principles.
-* **Persistence Layer (PostgreSQL & OS File System):** Strict separation between metadata (stored in the relational database) and the physical files. Access to the file system is mediated by a dedicated service that prevents directory traversal outside the secure base directory.
+## 3. Domain Model (DDD View)
+The domain model is organized around DDD aggregates. Authorization (RBAC / least privilege) and damage-reduction mechanisms (soft delete and file versioning/rollback) are represented explicitly in the model.
+
+![Domain Model Diagram](./assets/domain_model.png)
+
+## 4. Key Security and Design Notes
+- **Separation of responsibilities:** the database stores metadata (users, permissions, file/folder records), while the OS file system stores binary file contents.
+- **Authorization first:** access checks are performed before any OS-level file operation.
+- **Path traversal prevention by design:** physical storage paths are derived from safe identifiers (e.g., UUIDs) and restricted to a configured base directory.
+- **Damage reduction:** soft delete and file version history reduce the impact of accidental or malicious destructive actions.
