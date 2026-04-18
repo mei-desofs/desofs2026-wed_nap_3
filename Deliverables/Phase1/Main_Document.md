@@ -670,233 +670,468 @@ This section consolidates all security requirements (from Section 4.3) with thei
 
 ## 11. Security Testing Plan
 
-### 11.1 Methodology
+> **Shift-left note:** All test cases in this section are defined during Phase 1 (design). No code exists yet. Execution is planned for Phase 2 sprints. Defining tests now ensures every security requirement has a concrete verification method before implementation begins.
 
-Security testing follows a **risk-based, threat-driven** approach aligned with ASVS Level 2. The strategy combines:
+### 11.1 Testing Methodology
 
-| Layer | Technique | When |
-|-------|-----------|------|
-| Static Analysis | SAST — SonarQube / Semgrep | Every commit / CI pipeline |
-| Dependency Analysis | SCA — OWASP Dependency-Check | Every build / CI pipeline |
-| Dynamic Analysis | DAST — OWASP ZAP | Per sprint (Phase 2) |
-| Integration tests | JUnit + Spring Boot Test security flows | Every commit |
-| Manual testing | Targeted tests for high-risk areas | Per sprint (Phase 2) |
+Security testing follows a **risk-based, threat-driven** approach aligned with OWASP ASVS 5.0 Level 2. The strategy combines multiple complementary techniques executed at different points in the delivery pipeline:
+
+| Layer | Technique | Tool(s) | Trigger |
+|-------|-----------|---------|---------|
+| Static Analysis (SAST) | Source-code scanning for security patterns | SonarQube, Semgrep, Snyk Code | Every commit / CI pipeline |
+| Dependency Analysis (SCA) | Known CVE detection in third-party libraries | OWASP Dependency-Check, Snyk | Every build / CI pipeline |
+| Dynamic Analysis (DAST) | Black-box HTTP scanning of running endpoints | OWASP ZAP | Per sprint (Phase 2) |
+| Integration Tests | Automated security flow tests | JUnit 5 + Spring Boot Test | Every commit |
+| Load / Stress Testing | Rate-limiting and quota enforcement under load | Locust | Per sprint (Phase 2) |
+| Manual Penetration Testing | Targeted adversarial testing of CRITICAL risks | Burp Suite, Hydra, FuzzDB | Per sprint (Phase 2) |
+| Header / TLS Auditing | Verify security headers and cipher configuration | Mozilla Observatory, testssl.sh | Per sprint (Phase 2) |
 
 ### 11.2 Threat Modelling Review Process
 
 | Checkpoint | Trigger | Action |
 |------------|---------|--------|
 | Architecture change | Any change to DFD components or trust boundaries | Re-run STRIDE; update threat table |
-| New feature added | New API endpoint or data flow | Add to DFD; apply STRIDE |
+| New feature added | New API endpoint or data flow | Add to DFD; apply STRIDE; add test cases |
 | Phase 2 Sprint 1 start | Before implementation begins | Review all CRITICAL and HIGH threats |
 | Post-sprint | After each Phase 2 sprint | Verify mitigations implemented; update ASVS checklist |
 
 ### 11.3 Security Test Cases
 
-#### Authentication (SDR-01, ASVS V2)
+---
 
-| Test ID | Description | Type | Expected Result | Linked Threat |
-|---------|-------------|------|----------------|---------------|
-| ST-AUTH-01 | Submit request with `alg: none` JWT | Manual / Unit | HTTP 401 — token rejected | T-01, AC-01 |
-| ST-AUTH-02 | JWT with RS256 public key used as HS256 HMAC secret | Manual / Unit | HTTP 401 — token rejected | T-01, AC-01 |
-| ST-AUTH-03 | Submit expired JWT | Unit | HTTP 401 | T-01 |
-| ST-AUTH-04 | Submit JWT with tampered `sub` (another user's ID) | Unit | HTTP 403 (object-level check catches IDOR) | T-07, AC-04 |
-| ST-AUTH-05 | Brute force login (>N attempts) | DAST / Integration | HTTP 429 after threshold; account locked | T-10, AC-05 |
-| ST-AUTH-06 | Check login error message for "user not found" vs "wrong password" | Manual | Both return identical `"Invalid credentials"` | T-16 |
-| ST-AUTH-07 | Access protected endpoint without JWT | Unit | HTTP 401 | SDR-01 |
-| ST-AUTH-08 | Refresh token reuse after invalidation | Integration | HTTP 401 | SDR-01 |
+#### ST-01 — Path Traversal via Upload Filename
 
-#### Authorisation / Access Control (SDR-02, ASVS V4)
+**Objective:** Verify that a malicious filename cannot cause file writes outside the configured base storage directory.  
+**Linked Threats:** T-05 · **Abuse Case:** AC-02 · **SDR:** SDR-03, SDR-04 · **ASVS 5.0:** V12.3.1, V5.1.3  
+**Priority:** CRITICAL · **Method:** Integration test + Manual · **Phase:** Phase 2
 
-| Test ID | Description | Type | Expected Result | Linked Threat |
-|---------|-------------|------|----------------|---------------|
-| ST-AUTHZ-01 | EDITOR sends DELETE /files/{fileId} | Unit / Integration | HTTP 403 | T-09, AC-06 |
-| ST-AUTHZ-02 | VIEWER sends POST /files/upload | Unit / Integration | HTTP 403 | T-09 |
-| ST-AUTHZ-03 | Authenticated user accesses another user's file (IDOR attempt) | Integration | HTTP 403 | T-07, AC-04 |
-| ST-AUTHZ-04 | Authenticated user accesses /admin/users without Admin role | Integration | HTTP 403 | T-20 |
-| ST-AUTHZ-05 | Unauthenticated access to /admin/users | Integration | HTTP 401 | T-20 |
-| ST-AUTHZ-06 | EDITOR attempts to share resource with third user | Integration | HTTP 403 — only OWNER can share | SDR-02 |
-| ST-AUTHZ-07 | After OWNER revokes EDITOR access, EDITOR attempts download | Integration | HTTP 403 | FR-06 |
+**Steps:**
+1. Authenticate as a valid EDITOR user and obtain a JWT.
+2. Construct a multipart POST request to `POST /api/files/upload` with the filename field set to `../../etc/passwd`.
+3. Send the request and record the HTTP response code.
+4. Verify no file was written outside `/srv/files/` (check that `/etc/passwd` was not overwritten).
+5. Repeat with additional payloads: `..\..\windows\system32\config\sam`, `file%00.txt`, `....//....//etc/shadow`.
+6. Verify the stored physical file on disk uses a UUID filename, not the user-supplied string.
 
-#### File Upload Validation (SDR-03, SDR-04, SDR-05, ASVS V5, V12)
+**Expected Result:** HTTP 400 for all traversal payloads; no file created outside the base directory; UUID filename confirmed on disk.
 
-| Test ID | Description | Type | Expected Result | Linked Threat |
-|---------|-------------|------|----------------|---------------|
-| ST-UPLOAD-01 | Filename `../../etc/passwd` in multipart upload | Integration | HTTP 400; file NOT written outside base dir | T-05, AC-02 |
-| ST-UPLOAD-02 | Filename containing null byte `file\x00.txt` | Integration | HTTP 400 or sanitised filename | T-05, AC-02 |
-| ST-UPLOAD-03 | JSP file with `Content-Type: image/jpeg` | Integration | HTTP 400 — magic-byte check rejects | T-06, AC-03 |
-| ST-UPLOAD-04 | PHP script with `.php` extension | Integration | HTTP 400 — MIME whitelist rejects | T-06, AC-03 |
-| ST-UPLOAD-05 | File exceeding maximum allowed size | Integration | HTTP 413/400 before write | T-08, AC-08 |
-| ST-UPLOAD-06 | File exceeding user StorageQuota | Integration | HTTP 429 | T-18, AC-08 |
-| ST-UPLOAD-07 | Verify physical filename on disk is a UUID | Integration | UUID-named file in base dir; no traversal path on disk | T-05 |
-| ST-UPLOAD-08 | Upload to a folder belonging to another user | Integration | HTTP 403 — AccessShare check | T-07 |
+---
 
-#### Folder Operations (SDR-04, ASVS V5)
+#### ST-02 — IDOR — Cross-User Resource Access
 
-| Test ID | Description | Type | Expected Result | Linked Threat |
-|---------|-------------|------|----------------|---------------|
-| ST-FOLDER-01 | Create folder with name `../../../etc` | Integration | HTTP 400; no directory created outside base dir | T-05b |
-| ST-FOLDER-02 | Rename folder with traversal in new name | Integration | HTTP 400 | T-05b |
-| ST-FOLDER-03 | Delete folder without OWNER role | Integration | HTTP 403 | T-09 |
+**Objective:** Verify that a user cannot access another user's file or folder by guessing or substituting a resource UUID.  
+**Linked Threats:** T-07 · **Abuse Case:** AC-04 · **SDR:** SDR-02 · **ASVS 5.0:** V4.2.1  
+**Priority:** CRITICAL · **Method:** Integration test · **Phase:** Phase 2
 
-#### Data Security (SDR-06, ASVS V2)
+**Steps:**
+1. Create User A and User B. Upload a file as User A; record the returned `fileId` (UUID).
+2. Authenticate as User B (obtain a separate JWT).
+3. Send `GET /api/files/{fileId}` using User B's JWT and User A's `fileId`.
+4. Send `DELETE /api/files/{fileId}` using User B's JWT and User A's `fileId`.
+5. Repeat for a folder resource owned by User A.
+6. Verify that no AccessShare record exists for User B on User A's resource.
 
-| Test ID | Description | Type | Expected Result | Linked Threat |
-|---------|-------------|------|----------------|---------------|
-| ST-DATA-01 | Verify password stored in DB | Unit | PasswordHash is BCrypt or Argon2; not plaintext | T-14 |
-| ST-DATA-02 | Verify DB user lacks DDL permissions | Integration / Config | `DROP TABLE` command fails with permission denied | T-15 |
-| ST-DATA-03 | Verify HTTPS enforced; HTTP redirects | Manual / Config | HTTP 301/302 to HTTPS; HSTS header present | T-02 |
-| ST-DATA-04 | Verify HTTP security headers | Manual | HSTS, X-Content-Type-Options, X-Frame-Options, CSP present | SDR-09 |
+**Expected Result:** HTTP 403 for all cross-user requests; User B can never access User A's resources without an explicit AccessShare grant.
 
-#### File Integrity (SDR-NEW-11, ASVS V9)
+---
 
-| Test ID | Description | Type | Expected Result | Linked Threat |
-|---------|-------------|------|----------------|---------------|
-| ST-INTEG-01 | Tamper with stored file on disk; attempt download | Integration | HTTP 500; DOWNLOAD_INTEGRITY_FAIL logged; file NOT served | T-17, AC-10 |
-| ST-INTEG-02 | Download unmodified file; verify FileHash matches | Unit | File served; SHA-256 matches stored FileHash | T-17 |
+#### ST-03 — Malicious File Upload (Web Shell / RCE)
 
-#### Audit Logging (FR-08, SDR-NEW-03, ASVS V7)
+**Objective:** Verify that executable files (JSP, PHP, WAR) are rejected regardless of the `Content-Type` header sent by the client.  
+**Linked Threats:** T-06 · **Abuse Case:** AC-03 · **SDR:** SDR-03, SDR-05 · **ASVS 5.0:** V12.2.1  
+**Priority:** CRITICAL · **Method:** Integration test + Manual · **Phase:** Phase 2
 
-| Test ID | Description | Type | Expected Result | Linked Threat |
-|---------|-------------|------|----------------|---------------|
-| ST-LOG-01 | Perform upload; verify audit event emitted before response | Integration | ELK/SIEM receives UPLOAD event with correct fields | T-13, AC-09 |
-| ST-LOG-02 | Perform failed login; verify audit event emitted | Integration | ELK/SIEM receives failed auth event | T-13 |
-| ST-LOG-03 | Verify no password or JWT appears in any log entry | Unit / Log review | No sensitive data in audit events | T-19 |
-| ST-LOG-04 | Simulate ELK connection failure | Integration | Application returns error gracefully; no silent audit gap | T-13 |
+**Steps:**
+1. Prepare a valid JSP shell payload (e.g., `shell.jsp` with `<%Runtime.exec(request.getParameter("cmd"));%>`).
+2. Upload with `Content-Type: image/jpeg` and filename `image.jpg` (disguised as an image).
+3. Upload with the correct `Content-Type: application/x-jsp` and filename `shell.jsp`.
+4. Prepare a PHP payload and upload with `Content-Type: text/plain` and extension `.php`.
+5. Prepare a polyglot file (valid JPEG header + JSP payload appended).
+6. For each attempt, verify the server uses Apache Tika magic-byte detection — not the client-supplied Content-Type.
 
-#### SQL Injection (SDR-03, ASVS V5)
+**Expected Result:** HTTP 400 for all executable uploads; files never stored on disk; magic-byte check fires independently of client Content-Type.
 
-| Test ID | Description | Type | Expected Result | Linked Threat |
-|---------|-------------|------|----------------|---------------|
-| ST-SQLI-01 | OWASP ZAP active scan on all API endpoints | DAST (Phase 2) | No SQL injection vulnerabilities found | T-11 |
-| ST-SQLI-02 | Semgrep SAST rule: no string concatenation in SQL | SAST | Zero violations | T-11 |
-| ST-SQLI-03 | Upload file with SQL payload in filename | Integration | HTTP 400 or sanitised; no DB error | T-11, AC-07 |
+---
+
+#### ST-04 — Brute Force / Rate Limiting
+
+**Objective:** Verify that the login endpoint enforces rate limiting and account lockout after N consecutive failed attempts.  
+**Linked Threats:** T-10 · **Abuse Case:** AC-05 · **SDR:** SDR-10 · **ASVS 5.0:** V2.2.1  
+**Priority:** HIGH · **Method:** Integration test + Load test (Hydra) · **Phase:** Phase 2
+
+**Steps:**
+1. Configure Hydra: `hydra -l victim@example.com -P /usr/share/wordlists/rockyou.txt -s 8080 localhost http-post-form "/api/auth/login:email=^USER^&password=^PASS^:Invalid credentials"`.
+2. Execute and observe response codes after each attempt.
+3. Verify HTTP 429 is returned after the defined threshold (e.g., 5 failed attempts in 60 s).
+4. Verify the `Retry-After` header is present in the 429 response.
+5. Query the database (or audit log) to confirm `IsLocked=true` on the User aggregate after N failures.
+6. Attempt to login with the correct credentials while the account is locked; verify HTTP 403 or 429.
+
+**Expected Result:** HTTP 429 after threshold; account locked; Hydra unable to proceed; `IsLocked=true` confirmed.
+
+---
+
+#### ST-05 — JWT Algorithm Confusion / Token Replay
+
+**Objective:** Verify that the server rejects `alg: none` tokens, algorithm-confusion attacks, and replayed tokens after logout.  
+**Linked Threats:** T-01 · **Abuse Case:** AC-01 · **SDR:** SDR-01, SDR-NEW-01 · **ASVS 5.0:** V3.5.2, V3.2.2  
+**Priority:** CRITICAL · **Method:** Manual + Unit test · **Phase:** Phase 2
+
+**Steps:**
+1. Obtain a valid JWT from a successful login.
+2. Decode the JWT header; change `"alg": "RS256"` to `"alg": "none"`; re-encode and send to a protected endpoint.
+3. Take the RS256 public key and use it as an HMAC secret to sign a forged HS256 token; send to a protected endpoint.
+4. Perform a valid logout (DELETE /api/auth/logout).
+5. Replay the original (pre-logout) JWT against a protected endpoint.
+6. Verify server-side algorithm whitelist is enforced and the blocklist rejects replayed tokens.
+
+**Expected Result:** HTTP 401 for `alg: none`; HTTP 401 for algorithm-confusion token; HTTP 401 for replayed token after logout.
+
+---
+
+#### ST-06 — File Size Limits and Storage Quota DoS
+
+**Objective:** Verify that individual file size limits and per-user storage quotas are enforced before any disk write, preventing DoS.  
+**Linked Threats:** T-08, T-18 · **Abuse Case:** AC-08 · **SDR:** SDR-05, SDR-NEW-07 · **ASVS 5.0:** V12.2.3  
+**Priority:** CRITICAL · **Method:** Integration test + Load test (Locust) · **Phase:** Phase 2
+
+**Steps:**
+1. Upload a file exactly 1 byte above the configured maximum file size; verify HTTP 413.
+2. Upload a file exactly at the maximum size; verify HTTP 201 (accepted).
+3. Use Locust to simulate 50 concurrent users each uploading max-size files; verify all receive HTTP 413 above threshold.
+4. Upload files until the per-user `StorageQuota` is exhausted; verify the next upload returns HTTP 429.
+5. Verify in the database that `StorageQuota.usedBytes` is checked atomically before each write.
+6. Verify no partial file is left on disk when the size check or quota check fails.
+
+**Expected Result:** HTTP 413 for oversized files; HTTP 429 when quota exceeded; no partial writes on disk; server remains responsive under concurrent upload load.
+
+---
+
+#### ST-07 — Role Privilege Escalation (RBAC Enforcement)
+
+**Objective:** Verify that EDITOR and VIEWER roles cannot perform operations reserved for OWNER.  
+**Linked Threats:** T-09 · **Abuse Case:** AC-06 · **SDR:** SDR-02 · **ASVS 5.0:** V4.2.2  
+**Priority:** HIGH · **Method:** Integration test · **Phase:** Phase 2
+
+**Steps:**
+1. Authenticate as an EDITOR user for a specific `fileId`.
+2. Attempt `DELETE /api/files/{fileId}` — expect HTTP 403.
+3. Attempt `POST /api/files/{fileId}/share` to grant access to a third user — expect HTTP 403.
+4. Authenticate as a VIEWER user for the same `fileId`.
+5. Attempt `POST /api/files/upload` to the same folder — expect HTTP 403.
+6. Attempt `PUT /api/files/{fileId}` (edit metadata) — expect HTTP 403.
+7. Authenticate as the OWNER; confirm all the above operations succeed.
+
+**Expected Result:** HTTP 403 for all operations that exceed the assigned role; OWNER can perform all operations.
+
+---
+
+#### ST-08 — User Enumeration via Login Error Messages
+
+**Objective:** Verify that login failure messages are identical whether the email does not exist or the password is wrong.  
+**Linked Threats:** T-16 · **Abuse Case:** AC-05 · **SDR:** SDR-01, SDR-09 · **ASVS 5.0:** V2.2.5  
+**Priority:** MEDIUM · **Method:** Manual + Integration test · **Phase:** Phase 2
+
+**Steps:**
+1. Send `POST /api/auth/login` with a non-existent email and any password.
+2. Record the full HTTP response body and status code.
+3. Send `POST /api/auth/login` with a valid (registered) email and an incorrect password.
+4. Record the full HTTP response body and status code.
+5. Compare both responses byte-for-byte using Burp Suite Comparer.
+6. Check that no timing difference > 50 ms exists between the two response times (use `time` or Burp Intruder with timing).
+
+**Expected Result:** Both responses return HTTP 401 with identical body `{"error":"Invalid credentials"}`; response timing within acceptable variance.
+
+---
+
+#### ST-09 — HTTP Security Headers and TLS Configuration
+
+**Objective:** Verify that all required security headers are present and TLS 1.3 is enforced with no weak cipher suites.  
+**Linked Threats:** T-02, T-04 · **SDR:** SDR-09 · **ASVS 5.0:** V9.1.1, V9.1.2, V14.4.3, V14.4.4, V14.4.5  
+**Priority:** HIGH · **Method:** Automated scan (Mozilla Observatory) + Manual · **Phase:** Phase 2
+
+**Steps:**
+1. Run Mozilla Observatory scan against the deployed application URL: `observatory.mozilla.org`.
+2. Verify score A or above; confirm presence of: `Strict-Transport-Security: max-age=31536000; includeSubDomains`, `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`.
+3. Run `testssl.sh --full https://app.example.com`; confirm TLS 1.2 is disabled, TLS 1.3 is enabled.
+4. Verify no SSLv3, TLSv1.0, TLSv1.1 supported.
+5. Send a plain `http://` request; verify HTTP 301/302 redirect to HTTPS.
+6. Verify HSTS header prevents browser from following the HTTP→HTTPS redirect on subsequent requests.
+
+**Expected Result:** Mozilla Observatory score ≥ A; TLS 1.3 only; all required headers present; HTTP strictly redirects to HTTPS.
+
+---
+
+#### ST-10 — Password Hashing Algorithm Verification
+
+**Objective:** Verify that all stored passwords use BCrypt or Argon2id and that no plaintext, MD5, or SHA-1 hashes are stored.  
+**Linked Threats:** T-14 · **SDR:** SDR-06 · **ASVS 5.0:** V2.4.1, V2.4.2  
+**Priority:** HIGH · **Method:** Unit test + SAST (SonarQube) · **Phase:** Phase 2
+
+**Steps:**
+1. Register a new user via `POST /api/auth/register` with a known password.
+2. Query the database directly: `SELECT password_hash FROM users WHERE email = 'test@example.com'`.
+3. Verify the hash starts with `$2a$` (BCrypt) or `$argon2id$` (Argon2id).
+4. Confirm the hash is NOT the raw SHA-256, MD5, or plaintext of the input password.
+5. Run SonarQube SAST rule `java:S2053` (password hashing); confirm zero violations.
+6. Run Snyk Code scan; verify no "Weak Cryptographic Algorithm for Password Hashing" findings.
+
+**Expected Result:** Password hash uses BCrypt (`$2a$`) or Argon2id (`$argon2id$`); SAST reports zero violations; no plaintext or weak hashes in DB.
+
+---
+
+#### ST-11 — SQL Injection
+
+**Objective:** Verify that no API endpoint is vulnerable to SQL injection via prepared statements and SAST enforcement.  
+**Linked Threats:** T-11 · **Abuse Case:** AC-07 · **SDR:** SDR-03 · **ASVS 5.0:** V5.3.4  
+**Priority:** CRITICAL · **Method:** DAST (OWASP ZAP) + SAST + Manual (FuzzDB) · **Phase:** Phase 2
+
+**Steps:**
+1. Run OWASP ZAP active scan targeting all authenticated endpoints; verify zero SQL injection findings.
+2. Run Semgrep rule `java.lang.security.audit.sqli.jdbc-sqli` across the codebase; verify zero matches.
+3. Using FuzzDB `attack/sql-injection/detect/Generic_SQLI.txt`, send payloads in the `filename` field of upload: e.g., `' OR '1'='1`, `'; DROP TABLE files; --`.
+4. Send SQLi payloads in `folderId` path parameter and `search` query parameter if present.
+5. Verify all responses are HTTP 400 (rejected by input validation) or HTTP 200 with no DB error leakage.
+6. Confirm in application logs that no SQL error messages appear.
+
+**Expected Result:** Zero SQLi vulnerabilities in DAST scan; zero Semgrep matches; all FuzzDB payloads rejected with HTTP 400 or sanitised; no DB error messages in responses.
+
+---
+
+#### ST-12 — File Integrity Verification
+
+**Objective:** Verify that tampered files are detected on download and never served to the client.  
+**Linked Threats:** T-17 · **Abuse Case:** AC-10 · **SDR:** SDR-NEW-11 · **ASVS 5.0:** V9.2.2  
+**Priority:** HIGH · **Method:** Integration test · **Phase:** Phase 2
+
+**Steps:**
+1. Upload a known file; record the returned `fileId` and the SHA-256 hash stored in `FileVersion.fileHash`.
+2. Download the file normally; verify the SHA-256 of the downloaded bytes matches `fileHash`. Expect HTTP 200.
+3. Directly modify the file content on disk at `/srv/files/{uuid}` (bypass the API).
+4. Attempt to download the same `fileId` via the API.
+5. Verify the application recomputes the SHA-256 of the stored file, detects the mismatch, and returns HTTP 500.
+6. Verify the audit log contains a `DOWNLOAD_INTEGRITY_FAIL` event with `userId`, `fileId`, and `timestamp`.
+
+**Expected Result:** HTTP 200 for unmodified files; HTTP 500 for tampered files; no tampered content served; integrity failure logged to ELK/SIEM.
+
+---
+
+#### ST-13 — Audit Log Completeness and Sensitive Data Exclusion
+
+**Objective:** Verify that all security-relevant events are logged to ELK/SIEM and that no sensitive data (passwords, JWTs, file content) appears in logs.  
+**Linked Threats:** T-13, T-19 · **Abuse Case:** AC-09 · **SDR:** SDR-NEW-03, NFR-04 · **ASVS 5.0:** V7.1.1, V7.1.2, V7.2.1, V7.2.2, V7.3.2  
+**Priority:** HIGH · **Method:** Integration test + Log review · **Phase:** Phase 2
+
+**Steps:**
+1. Perform a file upload; verify ELK/SIEM receives an `UPLOAD` event before the HTTP response is returned.
+2. Perform a failed login; verify a `LOGIN_FAILURE` event is emitted.
+3. Review the event schema in ELK: confirm fields are only `timestamp`, `userId`, `action`, `resourceId`, `resourceType`, `sourceIP`, `outcome`, `failureReason`.
+4. Grep all log lines for the test user's password string and JWT; confirm zero matches.
+5. Simulate an ELK connection failure (block the outbound port); verify the application logs a warning and returns an error — no silent audit gap.
+6. Attempt to delete a log entry via the ELK API; confirm write access is restricted.
+
+**Expected Result:** All security events logged before response; zero sensitive data in logs; ELK failure detected and alerted; logs are append-only.
+
+---
+
+#### ST-14 — Admin Endpoint Access Control
+
+**Objective:** Verify that admin endpoints are inaccessible to regular users and exposed only on the internal network.  
+**Linked Threats:** T-20 · **SDR:** SDR-02 · **ASVS 5.0:** V4.3.1  
+**Priority:** HIGH · **Method:** Integration test + Network scan · **Phase:** Phase 2
+
+**Steps:**
+1. Authenticate as a regular USER role; send `GET /admin/users` — expect HTTP 403.
+2. Send `GET /actuator/health` from an external IP — expect HTTP 403 or connection refused.
+3. Authenticate as an ADMIN role; send `GET /admin/users` — expect HTTP 200.
+4. Attempt to access `/actuator/env` from an external IP; verify it returns 403 or is not reachable.
+5. Run nmap against the public-facing port to confirm no admin endpoints are reachable from outside the internal network boundary.
+
+**Expected Result:** HTTP 403 for non-admin users on `/admin/*`; actuator endpoints not reachable from external IPs; admin access confirmed for ADMIN role only.
+
+---
+
+#### ST-15 — Dependency Vulnerability Scanning (SCA + SAST)
+
+**Objective:** Verify that no known CVEs exist in third-party dependencies and that SAST reports zero critical security issues.  
+**SDR:** SDR-07, SDR-08 · **ASVS 5.0:** V14.2.1  
+**Priority:** HIGH · **Method:** Automated CI scan (OWASP Dependency-Check, Snyk, SonarQube) · **Phase:** Every CI build
+
+**Steps:**
+1. Run OWASP Dependency-Check: `mvn dependency-check:check` — verify build fails on CVSS ≥ 7.0 findings.
+2. Run Snyk: `snyk test --severity-threshold=high` — verify zero high/critical CVEs in Spring Boot, JDBC driver, Apache Tika, Jackson.
+3. Run SonarQube quality gate — verify zero "Blocker" or "Critical" security issues.
+4. Run Semgrep with `p/java` ruleset — verify zero security findings.
+5. Check that all direct dependencies are pinned to explicit versions (no `LATEST` or range specifiers in `pom.xml`).
+
+**Expected Result:** Zero CVEs with CVSS ≥ 7.0; SonarQube quality gate passes; Semgrep zero findings; all dependencies pinned.
+
+---
 
 ### 11.4 Traceability Matrix
 
-| Security Requirement | Threats | Abuse Cases | Test Cases |
-|---------------------|---------|-------------|------------|
-| SDR-01 JWT auth | T-01, T-10 | AC-01, AC-05 | ST-AUTH-01 to 08 |
-| SDR-02 RBAC | T-07, T-09 | AC-04, AC-06 | ST-AUTHZ-01 to 07 |
-| SDR-03 Input validation | T-06, T-11 | AC-03, AC-07 | ST-UPLOAD-01 to 08, ST-SQLI-01 to 03 |
-| SDR-04 Path traversal | T-05, T-05b | AC-02 | ST-UPLOAD-01/02/07, ST-FOLDER-01/02 |
-| SDR-05 File limits | T-06, T-08 | AC-03, AC-08 | ST-UPLOAD-03 to 06 |
-| SDR-06 Password hashing | T-14 | — | ST-DATA-01 |
-| SDR-09 Security headers | T-02, T-04 | — | ST-DATA-03/04 |
-| SDR-10 Rate limiting | T-08, T-10 | AC-05, AC-08 | ST-AUTH-05, ST-UPLOAD-06 |
-| SDR-NEW-03 Audit forwarding | T-13 | AC-09 | ST-LOG-01 to 04 |
-| SDR-NEW-06 DML-only DB | T-11, T-15 | AC-07 | ST-DATA-02 |
-| SDR-NEW-07 StorageQuota | T-18 | AC-08 | ST-UPLOAD-06 |
-| SDR-NEW-11 FileHash | T-17 | AC-10 | ST-INTEG-01/02 |
-| FR-08 Audit log | T-13, T-19 | AC-09 | ST-LOG-01 to 04 |
+| Test ID | Description | Abuse Case | SDR Requirements | ASVS 5.0 | Method | Priority |
+|---------|-------------|------------|-----------------|-----------|--------|----------|
+| ST-01 | Path Traversal via Upload | AC-02 | SDR-03, SDR-04 | V12.3.1, V5.1.3 | Integration + Manual | CRITICAL |
+| ST-02 | IDOR Cross-User Access | AC-04 | SDR-02 | V4.2.1 | Integration | CRITICAL |
+| ST-03 | Web Shell / RCE Upload | AC-03 | SDR-03, SDR-05 | V12.2.1 | Integration + Manual | CRITICAL |
+| ST-04 | Brute Force / Rate Limiting | AC-05 | SDR-10 | V2.2.1 | Integration + Hydra | HIGH |
+| ST-05 | JWT Algorithm Confusion | AC-01 | SDR-01, SDR-NEW-01 | V3.5.2, V3.2.2 | Manual + Unit | CRITICAL |
+| ST-06 | File Size / Quota DoS | AC-08 | SDR-05, SDR-NEW-07 | V12.2.3 | Integration + Locust | CRITICAL |
+| ST-07 | RBAC Role Escalation | AC-06 | SDR-02 | V4.2.2 | Integration | HIGH |
+| ST-08 | User Enumeration | AC-05 | SDR-01, SDR-09 | V2.2.5 | Manual + Burp Comparer | MEDIUM |
+| ST-09 | Security Headers / TLS | — | SDR-09 | V9.1.1, V9.1.2, V14.4.3–5 | Mozilla Observatory + testssl.sh | HIGH |
+| ST-10 | Password Hashing | — | SDR-06 | V2.4.1, V2.4.2 | Unit + SonarQube | HIGH |
+| ST-11 | SQL Injection | AC-07 | SDR-03 | V5.3.4 | DAST (ZAP) + FuzzDB + SAST | CRITICAL |
+| ST-12 | File Integrity | AC-10 | SDR-NEW-11 | V9.2.2 | Integration | HIGH |
+| ST-13 | Audit Log Completeness | AC-09 | SDR-NEW-03, NFR-04 | V7.1.1, V7.2.1, V7.3.2 | Integration + Log review | HIGH |
+| ST-14 | Admin Endpoint Exposure | — | SDR-02 | V4.3.1 | Integration + nmap | HIGH |
+| ST-15 | Dependency / SAST Scan | — | SDR-07, SDR-08 | V14.2.1 | OWASP DC + Snyk + SonarQube | HIGH |
+
+### 11.5 Abuse Case Coverage
+
+| Abuse Case | Description | Test Cases |
+|------------|-------------|------------|
+| AC-01 JWT Replay / Forgery | Forge or replay JWT tokens | ST-05 |
+| AC-02 Path Traversal | Escape base storage directory | ST-01 |
+| AC-03 Web Shell Upload | Upload executable for RCE | ST-03 |
+| AC-04 IDOR | Access another user's resources | ST-02 |
+| AC-05 Brute Force / Enumeration | Credential stuffing, user enum | ST-04, ST-08 |
+| AC-06 Role Privilege Escalation | Exceed role permissions | ST-07 |
+| AC-07 SQL Injection | Inject SQL via filenames/params | ST-11 |
+| AC-08 Storage/Bandwidth DoS | Exhaust disk space or bandwidth | ST-06 |
+| AC-09 Audit Log Tampering | Delete or suppress audit trail | ST-13 |
+| AC-10 File Integrity Bypass | Serve tampered file content | ST-12 |
 
 ---
 
 ## 12. ASVS Checklist
 
-ASVS Level 2 applied with architecture focus. **Status:** ✅ Addressed · ⚠️ Partial · 🔲 Phase 2 · ❌ N/A
+**Standard:** OWASP Application Security Verification Standard (ASVS) **version 5.0**  
+**Level:** L2 — Architecture and design focus  
+**Phase:** 1 — No code exists yet; verification is at design level only.
 
-### V1 — Architecture, Design and Threat Modeling
+### Status Legend
 
-| ASVS ID | Requirement | Status | Notes |
-|---------|-------------|--------|-------|
-| V1.1.2 | Threat modeling for every design change | ✅ | STRIDE per DFD element — Section 6 |
-| V1.1.3 | Functional security constraints for all features | ✅ | FR + SDR requirements — Section 4 |
-| V1.1.4 | All trust boundaries documented and justified | ✅ | DFD Level 0/1/2 — Section 5 |
-| V1.2.3 | Least-privilege access for all components | ✅ | DML-only DB user; restricted FS directory |
-| V1.2.4 | All app components documented with known attack surface | ✅ | DFDs + STRIDE table |
+| Status | Meaning |
+|--------|---------|
+| ✅ **Decided (Architecture)** | The architectural decision is documented and the control is addressed at design level. Will be verified by code review and testing in Phase 2. |
+| 🔲 **Not Started** | Requirement identified; implementation and verification deferred to Phase 2. |
+| ❌ **Not Applicable** | Control is not relevant for this system's architecture or technology stack. |
+
+> **Note on Phase 1 status:** Since no code base exists at this stage, no control can be marked as fully "Compliant". Controls marked ✅ reflect documented architectural decisions that the implementation must uphold. All controls will be re-evaluated in Phase 2 against running code using SAST, DAST, and code review.
 
 ### V2 — Authentication
 
-| ASVS ID | Requirement | Status | Notes |
-|---------|-------------|--------|-------|
-| V2.2.1 | Anti-automation controls (rate limiting, lockout) | ✅ | SDR-10 — rate limiting; IsLocked — SDR-01 |
-| V2.4.1 | Passwords stored with BCrypt, Argon2, or PBKDF2 | ✅ | SDR-06 |
-| V2.9.1 | Cryptographic keys stored securely | ✅ | JWT signing key via environment variable / vault |
+| ASVS ID | Level | Requirement | Status | Justification / Architectural Decision |
+|---------|-------|-------------|--------|----------------------------------------|
+| V2.1.1 | L1 | Passwords require a minimum of 12 characters | 🔲 | Requirement identified. To be enforced at the registration endpoint input validation layer. Mitigates AC-05 (Brute Force). |
+| V2.2.1 | L1 | Rate limiting on authentication endpoint | ✅ | SDR-10 — rate limiting defined. HTTP 429 returned after threshold. `IsLocked=true` on User aggregate after N failures. Test: ST-04. |
+| V2.2.4 | L2 | Defences against credential stuffing (CAPTCHA or advanced rate limiting) | 🔲 | Mechanism to be decided in Phase 2 (CAPTCHA vs exponential backoff). See AC-05. |
+| V2.2.5 | L1 | Generic error messages on login failure | ✅ | SDR-01 / SDR-09 — identical `"Invalid credentials"` message for both "user not found" and "wrong password". Prevents user enumeration (T-16). Test: ST-08. |
+| V2.4.1 | L1 | Passwords stored with BCrypt or Argon2id | ✅ | SDR-06 — BCrypt or Argon2 with appropriate work factor required. Algorithm to be confirmed and implemented in Phase 2. Verified by SAST (SonarQube/Snyk) and code review. Test: ST-10. |
+| V2.4.2 | L1 | Absence of MD5, SHA-1, or plain SHA-256 for passwords | ✅ | SDR-06 — Only adaptive hashing algorithms permitted. Verified in Phase 2 by SAST. Test: ST-10. |
+| V2.9.1 | L2 | Cryptographic keys used in verification stored securely | ✅ | JWT signing key stored in environment variable / secrets vault — never hardcoded in source. |
 
 ### V3 — Session Management
 
-| ASVS ID | Requirement | Status | Notes |
-|---------|-------------|--------|-------|
-| V3.2.1 | New session tokens generated at login | ✅ | New JWT issued at each successful login |
-| V3.5.1 | OAuth/JWT tokens checked for audience, issuer, expiry | ✅ | SDR-01, SDR-NEW-01 |
-| V3.7.1 | Session tokens not exposed in URLs | ✅ | JWT only in Authorization header |
+| ASVS ID | Level | Requirement | Status | Justification / Architectural Decision |
+|---------|-------|-------------|--------|----------------------------------------|
+| V3.2.1 | L1 | New session tokens generated on each authentication | ✅ | New JWT issued on each successful login; refresh token rotation defined. |
+| V3.2.2 | L1 | Session tokens invalidated / revoked on logout | 🔲 | Requires a server-side JWT blocklist. Critical for AC-01 (JWT replay, T-01). To be implemented in Phase 2. Test: ST-05. |
+| V3.2.3 | L1 | Session tokens are at least 128 bits of entropy | ✅ | JWT with RS256/HS256 provides sufficient entropy. |
+| V3.5.2 | L2 | JWT tokens signed with secure algorithm (RS256 / ES256) | ✅ | SDR-NEW-01 — server-side algorithm whitelist; `alg: none` explicitly rejected. Signing algorithm to be configured in Phase 2. Test: ST-05. |
+| V3.7.1 | L1 | Session tokens not exposed in URLs | ✅ | JWT transmitted only in `Authorization: Bearer` header — never in URL or query parameter. |
 
 ### V4 — Access Control
 
-| ASVS ID | Requirement | Status | Notes |
-|---------|-------------|--------|-------|
-| V4.1.1 | Access control enforced at a trusted server-side point | ✅ | AccessShare checked server-side before every operation |
-| V4.1.2 | Access control fails securely (default deny) | ✅ | No AccessShare record → HTTP 403 |
-| V4.2.1 | All user and data attributes protected from IDOR | ✅ | Object-level AccessShare check per resourceId (SDR-02) |
-| V4.2.2 | Business logic enforces access controls | ✅ | RBAC matrix defined and enforced |
-| V4.3.1 | Admin interfaces require additional authentication | ✅ | JWT Admin role required |
-| V4.3.2 | Directory browsing disabled | ✅ | Files never served as static content; always proxied |
+| ASVS ID | Level | Requirement | Status | Justification / Architectural Decision |
+|---------|-------|-------------|--------|----------------------------------------|
+| V4.1.1 | L1 | Access control enforced at a trusted server-side enforcement point | ✅ | AccessShare aggregate checked server-side before every operation. Default deny: no AccessShare record → HTTP 403. |
+| V4.1.2 | L1 | Access control fails securely (default deny) | ✅ | If no AccessShare record exists for the caller and resourceId, access is denied. SDR-02. |
+| V4.2.1 | L1 | All user and data attributes protected from IDOR | ✅ | SDR-02 — object-level AccessShare check per `resourceId` for every API call. Authentication alone is insufficient. Test: ST-02. |
+| V4.2.2 | L1 | Business logic enforces access controls at operation level | ✅ | RBAC matrix defined: DELETE is OWNER-only; EDITOR = upload/download; VIEWER = download only. Test: ST-07. |
+| V4.3.1 | L1 | Admin interfaces require additional authentication factor or context | ✅ | Admin endpoints require JWT with explicit Admin role. Spring Boot Actuator restricted to internal network only. Test: ST-14. |
+| V4.3.2 | L1 | Directory browsing disabled | ✅ | Files never served as static content — always proxied through the API with AccessShare enforcement. UUID filenames prevent guessing. |
 
-### V5 — Validation, Sanitization and Encoding
+### V5 — Input Validation
 
-| ASVS ID | Requirement | Status | Notes |
-|---------|-------------|--------|-------|
-| V5.1.2 | Input validation with allow-list approach | ✅ | MIME type whitelist; filename sanitisation |
-| V5.3.4 | DB queries use parameterised queries | ✅ | JDBC prepared statements only (SDR-03) |
-| V5.3.8 | OS commands do not use user-supplied input | ✅ | No `Runtime.exec()`; all OS I/O via Java NIO with UUID paths |
+| ASVS ID | Level | Requirement | Status | Justification / Architectural Decision |
+|---------|-------|-------------|--------|----------------------------------------|
+| V5.1.1 | L1 | HTTP parameter pollution attacks defended | ✅ | Spring Boot processes only the first instance of repeated parameters by default. |
+| V5.1.3 | L1 | All inputs validated server-side (size, format, type) | ✅ | SDR-03 — MIME type whitelist; filename sanitisation; file size check before buffering. Tests: ST-01, ST-03. |
+| V5.2.1 | L1 | Inputs sanitised against injection (SQL, path, XSS) | ✅ | SDR-03, SDR-04 — prepared statements for SQL; `Path.normalize()` + base-dir check for paths. No HTML rendering (XSS N/A). Tests: ST-01, ST-11. |
+| V5.3.4 | L1 | Database queries use parameterised queries / prepared statements | ✅ | SDR-03 — JDBC prepared statements and JPA named queries exclusively. String concatenation in SQL is prohibited. Test: ST-11. |
+| V5.3.8 | L1 | OS commands do not use user-supplied input | ✅ | No `Runtime.exec()` calls. All OS I/O performed via Java NIO using system-generated UUID paths — user-supplied filenames are never used as path components. |
 
 ### V7 — Error Handling and Logging
 
-| ASVS ID | Requirement | Status | Notes |
-|---------|-------------|--------|-------|
-| V7.1.1 | Application does not log credentials or tokens | ✅ | Audit event schema excludes passwords, JWTs (NFR-04) |
-| V7.2.1 | All authentication decisions are logged | ✅ | Login success/failure events → ELK/SIEM |
-| V7.2.2 | Security-relevant events logged with sufficient detail | ✅ | timestamp, userId, action, resourceId, sourceIP, outcome |
-| V7.3.2 | Logs protected from unauthorised access and modification | ✅ | Forwarded to external ELK/SIEM (SDR-NEW-03) |
-| V7.4.1 | Generic error message on unexpected error | ✅ | Global exception handler (SDR-09) |
-| V7.4.2 | Exception handling does not disclose technical information | ✅ | Stack traces never returned in responses |
+| ASVS ID | Level | Requirement | Status | Justification / Architectural Decision |
+|---------|-------|-------------|--------|----------------------------------------|
+| V7.1.1 | L1 | Application does not log credentials or session tokens | ✅ | Audit event schema explicitly excludes passwords, JWTs, and file content. Only: `timestamp`, `userId`, `action`, `resourceId`, `sourceIP`, `outcome`. NFR-04. Test: ST-13. |
+| V7.1.2 | L1 | Application does not log other sensitive personal data | ✅ | Log format defined to include only non-sensitive operational fields. Test: ST-13. |
+| V7.2.1 | L1 | All authentication decisions are logged | ✅ | Login success and failure events forwarded to ELK/SIEM. Test: ST-13. |
+| V7.2.2 | L2 | Security-relevant events logged with sufficient data for investigation | ✅ | Each audit event: `timestamp (ISO-8601 UTC)`, `userId`, `action`, `resourceId`, `resourceType`, `sourceIP`, `outcome`, `failureReason (generic)`. |
+| V7.3.2 | L1 | Logs protected from unauthorised access and modification | ✅ | SDR-NEW-03 — audit events forwarded to external ELK/SIEM in real time before response is returned. Logs not stored exclusively locally. Test: ST-13. |
+| V7.4.1 | L1 | Generic error message shown on unexpected error | ✅ | SDR-09 — global exception handler returns only generic messages. Stack traces never exposed in production responses. |
+| V7.4.2 | L1 | Exception handling does not disclose technical information | ✅ | Stack traces, internal paths, and framework versions never returned in HTTP responses. |
+
+### V8 — Data Protection
+
+| ASVS ID | Level | Requirement | Status | Justification / Architectural Decision |
+|---------|-------|-------------|--------|----------------------------------------|
+| V8.2.1 | L1 | Application does not expose sensitive data in URLs | ✅ | JWT transmitted in `Authorization` header only; resource IDs are UUIDs — no sequential integers that aid enumeration. |
+| V8.3.1 | L1 | Sensitive data sent in HTTP body or headers, not URLs | ✅ | Credentials in POST body; JWT in Authorization header. Never in URL query parameters. |
+| V8.3.4 | L1 | Object IDs are non-predictable | ✅ | All `resourceId` values are UUID v4 — not sequential integers. Prevents IDOR enumeration. SDR-02. |
 
 ### V9 — Communication
 
-| ASVS ID | Requirement | Status | Notes |
-|---------|-------------|--------|-------|
-| V9.1.1 | TLS used for all connections | ✅ | HTTPS/TLS 1.3 enforced (NFR-01) |
-| V9.2.1 | Server-side connections use trusted TLS certificates | ✅ | JDBC over TLS; ELK over HTTPS/TLS |
+| ASVS ID | Level | Requirement | Status | Justification / Architectural Decision |
+|---------|-------|-------------|--------|----------------------------------------|
+| V9.1.1 | L1 | TLS used for all connections; HTTP redirects to HTTPS; HSTS active | ✅ | NFR-01, SDR-09 — HTTPS/TLS 1.3 enforced. HSTS with `max-age >= 31536000` via Spring Security. Test: ST-09. |
+| V9.1.2 | L2 | Strong cipher suites only | 🔲 | TLS 1.3 limits to strong cipher suites by default; explicit configuration in Phase 2. |
+| V9.2.1 | L1 | Server-side connections use trusted TLS certificates | ✅ | JDBC connection to PostgreSQL over TLS; ELK/SIEM connection over HTTPS/TLS. |
+| V9.2.2 | L2 | Sensitive data not sent in URL parameters | ✅ | JWT in headers; file IDs in path (UUIDs) — no sensitive parameters in query strings. |
 
 ### V12 — Files and Resources
 
-| ASVS ID | Requirement | Status | Notes |
-|---------|-------------|--------|-------|
-| V12.1.1 | Application does not accept large files that could overwhelm storage | ✅ | Max file size + StorageQuota (SDR-05, SDR-NEW-07) |
-| V12.3.1 | User-submitted filenames sanitised before use | ✅ | Strip `../`, `/`, `\`, null bytes (SDR-04) |
-| V12.3.2 | User-submitted filenames not used directly in file I/O | ✅ | Physical path is always a UUID; original stored only as metadata |
-| V12.3.3 | Path traversal attacks mitigated | ✅ | `Path.normalize()` + base-dir validation (SDR-04) |
-| V12.3.4 | Files not executed from untrusted sources | ✅ | Files stored outside web root; no execute permissions |
-| V12.4.1 | Files stored outside the web root | ✅ | `/srv/files/` — outside web root |
-| V12.4.2 | Files have restricted permissions (not executable) | ✅ | Storage directory has no execute permissions |
-| V12.5.1 | Web tier only serves files with defined extensions | ✅ | Files always proxied through API; no direct static URL access |
-| V12.5.2 | Direct requests to uploaded files cannot be executed | ✅ | UUID names + out-of-webroot + always proxied through API |
+| ASVS ID | Level | Requirement | Status | Justification / Architectural Decision |
+|---------|-------|-------------|--------|----------------------------------------|
+| V12.2.1 | L1 | Server validates real file type via magic bytes | ✅ | SDR-03 — Apache Tika used to validate file type via magic bytes; `Content-Type` header from client is never trusted. Critical: AC-03 (RCE). Test: ST-03. |
+| V12.2.3 | L1 | Maximum file size enforced | ✅ | SDR-05, SDR-NEW-07 — maximum file size enforced before buffering. Per-user `StorageQuota` checked before write. Test: ST-06. |
+| V12.3.1 | L1 | Path traversal prevented — paths normalised against base directory | ✅ | SDR-04 — `java.nio.file.Path.normalize()` applied; result verified to start with the configured base directory before any I/O. Test: ST-01. |
+| V12.3.3 | L1 | Uploaded files stored outside the web root | ✅ | `/srv/files/` or equivalent — outside web root. Files never served via static URL. |
+| V12.3.4 | L1 | Uploaded files cannot be executed | ✅ | Storage directory has no execute permissions. UUID filenames prevent any execution even if stored. |
+| V12.5.1 | L1 | Web tier only serves files via defined extensions / controlled access | ✅ | Files only accessible via API endpoints — never as static files. All downloads proxied through the application with AccessShare enforcement. |
 
 ### V14 — Configuration
 
-| ASVS ID | Requirement | Status | Notes |
-|---------|-------------|--------|-------|
-| V14.2.1 | All components up to date | ✅ | SCA (OWASP Dependency-Check) in CI pipeline (SDR-07) |
-| V14.3.1 | Web server error messages do not expose stack traces | ✅ | SDR-09; global exception handler |
-| V14.4.3 | Content Security Policy (CSP) header set | ✅ | SDR-09 — Spring Security HTTP headers |
-| V14.4.4 | `X-Content-Type-Options: nosniff` present | ✅ | SDR-09 |
-| V14.4.5 | HSTS included in all responses | ✅ | SDR-09 — HSTS enabled in Spring Security |
+| ASVS ID | Level | Requirement | Status | Justification / Architectural Decision |
+|---------|-------|-------------|--------|----------------------------------------|
+| V14.2.1 | L1 | All components are up to date | ✅ | SDR-07 — OWASP Dependency-Check and Snyk integrated in CI pipeline. Test: ST-15. |
+| V14.3.1 | L1 | Server error messages do not expose stack traces | ✅ | SDR-09 — Global exception handler; generic messages only in production. |
+| V14.4.3 | L1 | Content Security Policy (CSP) header set | ✅ | SDR-09 — HTTP security headers configured via Spring Security. Test: ST-09. |
+| V14.4.4 | L1 | `X-Content-Type-Options: nosniff` present | ✅ | SDR-09 — Spring Security default headers. Test: ST-09. |
+| V14.4.5 | L1 | HTTP Strict Transport Security (HSTS) in all responses | ✅ | SDR-09 — HSTS with `max-age >= 31536000` via Spring Security. Test: ST-09. |
+| V14.5.1 | L1 | HTTP server only accepts allowed HTTP methods | ✅ | Spring MVC maps only defined HTTP verbs per endpoint. |
+| V14.5.2 | L2 | `Origin` header validated against allow-list | 🔲 | CORS configuration to be implemented in Phase 2. |
 
-### ASVS Coverage Summary (Level 2 — Architecture Focus)
+### ASVS Coverage Summary
 
-| Chapter | Addressed ✅ | Partial ⚠️ | Phase 2 🔲 | N/A ❌ |
-|---------|:-----------:|:---------:|:---------:|:-----:|
-| V1 Architecture | 7 | 2 | 0 | 1 |
-| V2 Authentication | 7 | 2 | 1 | 0 |
-| V3 Session Management | 5 | 0 | 2 | 0 |
-| V4 Access Control | 7 | 1 | 0 | 1 |
-| V5 Validation | 6 | 2 | 0 | 1 |
-| V7 Logging | 7 | 1 | 0 | 0 |
-| V9 Communication | 3 | 2 | 0 | 0 |
-| V12 Files & Resources | 10 | 0 | 2 | 0 |
-| V14 Configuration | 8 | 2 | 3 | 0 |
-| **Total** | **60 (72%)** | **12 (14%)** | **8 (10%)** | **3 (4%)** |
+| Chapter | ✅ Decided (Architecture) | 🔲 Not Started (Phase 2) | ❌ N/A | Total |
+|---------|:------------------------:|:------------------------:|:-----:|-------|
+| V2 Authentication | 5 | 2 | 0 | 7 |
+| V3 Session Management | 4 | 1 | 0 | 5 |
+| V4 Access Control | 6 | 0 | 0 | 6 |
+| V5 Input Validation | 5 | 0 | 0 | 5 |
+| V7 Error Handling & Logging | 7 | 0 | 0 | 7 |
+| V8 Data Protection | 3 | 0 | 0 | 3 |
+| V9 Communication | 3 | 1 | 0 | 4 |
+| V12 Files & Resources | 6 | 0 | 0 | 6 |
+| V14 Configuration | 6 | 1 | 0 | 7 |
+| **Total** | **45 (82%)** | **5 (9%)** | **0** | **55** |
+
+> **Baseline for Phase 2:** All 55 controls will be re-evaluated in Phase 2 once implementation is available. Controls marked 🔲 will be addressed during Sprint 1 implementation. Controls marked ✅ will be verified by SAST, DAST, integration tests, and code review.
 
 ---
 
