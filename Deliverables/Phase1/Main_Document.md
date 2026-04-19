@@ -702,7 +702,7 @@ Security testing follows a **risk-based, threat-driven** approach aligned with O
 #### ST-01 — Path Traversal via Upload Filename
 
 **Objective:** Verify that a malicious filename cannot cause file writes outside the configured base storage directory.  
-**Linked Threats:** T-05 · **Abuse Case:** AC-02 · **SDR:** SDR-03, SDR-04 · **ASVS 5.0:** V12.3.1, V5.1.3  
+**Linked Threats:** T-05 · **Abuse Case:** AC-02 · **SDR:** SDR-03, SDR-04  
 **Priority:** CRITICAL · **Method:** Integration test + Manual · **Phase:** Phase 2
 
 **Steps:**
@@ -720,7 +720,7 @@ Security testing follows a **risk-based, threat-driven** approach aligned with O
 #### ST-02 — IDOR — Cross-User Resource Access
 
 **Objective:** Verify that a user cannot access another user's file or folder by guessing or substituting a resource UUID.  
-**Linked Threats:** T-07 · **Abuse Case:** AC-04 · **SDR:** SDR-02 · **ASVS 5.0:** V4.2.1  
+**Linked Threats:** T-07 · **Abuse Case:** AC-04 · **SDR:** SDR-02   
 **Priority:** CRITICAL · **Method:** Integration test · **Phase:** Phase 2
 
 **Steps:**
@@ -738,7 +738,7 @@ Security testing follows a **risk-based, threat-driven** approach aligned with O
 #### ST-03 — Malicious File Upload (Web Shell / RCE)
 
 **Objective:** Verify that executable files (JSP, PHP, WAR) are rejected regardless of the `Content-Type` header sent by the client.  
-**Linked Threats:** T-06 · **Abuse Case:** AC-03 · **SDR:** SDR-03, SDR-05 · **ASVS 5.0:** V12.2.1  
+**Linked Threats:** T-06 · **Abuse Case:** AC-03 · **SDR:** SDR-03, SDR-05  
 **Priority:** CRITICAL · **Method:** Integration test + Manual · **Phase:** Phase 2
 
 **Steps:**
@@ -756,7 +756,7 @@ Security testing follows a **risk-based, threat-driven** approach aligned with O
 #### ST-04 — Brute Force / Rate Limiting
 
 **Objective:** Verify that the login endpoint enforces rate limiting and account lockout after N consecutive failed attempts.  
-**Linked Threats:** T-10 · **Abuse Case:** AC-05 · **SDR:** SDR-10 · **ASVS 5.0:** V2.2.1  
+**Linked Threats:** T-10 · **Abuse Case:** AC-05 · **SDR:** SDR-10   
 **Priority:** HIGH · **Method:** Integration test + Load test (Hydra) · **Phase:** Phase 2
 
 **Steps:**
@@ -774,7 +774,7 @@ Security testing follows a **risk-based, threat-driven** approach aligned with O
 #### ST-05 — JWT Algorithm Confusion / Token Replay
 
 **Objective:** Verify that the server rejects `alg: none` tokens, algorithm-confusion attacks, and replayed tokens after logout.  
-**Linked Threats:** T-01 · **Abuse Case:** AC-01 · **SDR:** SDR-01, SDR-NEW-01 · **ASVS 5.0:** V3.5.2, V3.2.2  
+**Linked Threats:** T-01 · **Abuse Case:** AC-01 · **SDR:** SDR-01, SDR-NEW-01   
 **Priority:** CRITICAL · **Method:** Manual + Unit test · **Phase:** Phase 2
 
 **Steps:**
@@ -792,7 +792,7 @@ Security testing follows a **risk-based, threat-driven** approach aligned with O
 #### ST-06 — File Size Limits and Storage Quota DoS
 
 **Objective:** Verify that individual file size limits and per-user storage quotas are enforced before any disk write, preventing DoS.  
-**Linked Threats:** T-08, T-18 · **Abuse Case:** AC-08 · **SDR:** SDR-05, SDR-NEW-07 · **ASVS 5.0:** V12.2.3  
+**Linked Threats:** T-08, T-18 · **Abuse Case:** AC-08 · **SDR:** SDR-05, SDR-NEW-07  
 **Priority:** CRITICAL · **Method:** Integration test + Load test (Locust) · **Phase:** Phase 2
 
 **Steps:**
@@ -810,7 +810,7 @@ Security testing follows a **risk-based, threat-driven** approach aligned with O
 #### ST-07 — Role Privilege Escalation (RBAC Enforcement)
 
 **Objective:** Verify that EDITOR and VIEWER roles cannot perform operations reserved for OWNER.  
-**Linked Threats:** T-09 · **Abuse Case:** AC-06 · **SDR:** SDR-02 · **ASVS 5.0:** V4.2.2  
+**Linked Threats:** T-09 · **Abuse Case:** AC-06 · **SDR:** SDR-02  
 **Priority:** HIGH · **Method:** Integration test · **Phase:** Phase 2
 
 **Steps:**
@@ -829,7 +829,7 @@ Security testing follows a **risk-based, threat-driven** approach aligned with O
 #### ST-08 — User Enumeration via Login Error Messages
 
 **Objective:** Verify that login failure messages are identical whether the email does not exist or the password is wrong.  
-**Linked Threats:** T-16 · **Abuse Case:** AC-05 · **SDR:** SDR-01, SDR-09 · **ASVS 5.0:** V2.2.5  
+**Linked Threats:** T-16 · **Abuse Case:** AC-05 · **SDR:** SDR-01, SDR-09   
 **Priority:** MEDIUM · **Method:** Manual + Integration test · **Phase:** Phase 2
 
 **Steps:**
@@ -847,7 +847,7 @@ Security testing follows a **risk-based, threat-driven** approach aligned with O
 #### ST-09 — HTTP Security Headers and TLS Configuration
 
 **Objective:** Verify that all required security headers are present and TLS 1.3 is enforced with no weak cipher suites.  
-**Linked Threats:** T-02, T-04 · **SDR:** SDR-09 · **ASVS 5.0:** V9.1.1, V9.1.2, V14.4.3, V14.4.4, V14.4.5  
+**Linked Threats:** T-02, T-04 · **SDR:** SDR-09   
 **Priority:** HIGH · **Method:** Automated scan (Mozilla Observatory) + Manual · **Phase:** Phase 2
 
 **Steps:**
@@ -865,7 +865,7 @@ Security testing follows a **risk-based, threat-driven** approach aligned with O
 #### ST-10 — Password Hashing Algorithm Verification
 
 **Objective:** Verify that all stored passwords use BCrypt or Argon2id and that no plaintext, MD5, or SHA-1 hashes are stored.  
-**Linked Threats:** T-14 · **SDR:** SDR-06 · **ASVS 5.0:** V2.4.1, V2.4.2  
+**Linked Threats:** T-14 · **SDR:** SDR-06   
 **Priority:** HIGH · **Method:** Unit test + SAST (SonarQube) · **Phase:** Phase 2
 
 **Steps:**
@@ -883,7 +883,7 @@ Security testing follows a **risk-based, threat-driven** approach aligned with O
 #### ST-11 — SQL Injection
 
 **Objective:** Verify that no API endpoint is vulnerable to SQL injection via prepared statements and SAST enforcement.  
-**Linked Threats:** T-11 · **Abuse Case:** AC-07 · **SDR:** SDR-03 · **ASVS 5.0:** V5.3.4  
+**Linked Threats:** T-11 · **Abuse Case:** AC-07 · **SDR:** SDR-03   
 **Priority:** CRITICAL · **Method:** DAST (OWASP ZAP) + SAST + Manual (FuzzDB) · **Phase:** Phase 2
 
 **Steps:**
@@ -901,7 +901,7 @@ Security testing follows a **risk-based, threat-driven** approach aligned with O
 #### ST-12 — File Integrity Verification
 
 **Objective:** Verify that tampered files are detected on download and never served to the client.  
-**Linked Threats:** T-17 · **Abuse Case:** AC-10 · **SDR:** SDR-NEW-11 · **ASVS 5.0:** V9.2.2  
+**Linked Threats:** T-17 · **Abuse Case:** AC-10 · **SDR:** SDR-NEW-11   
 **Priority:** HIGH · **Method:** Integration test · **Phase:** Phase 2
 
 **Steps:**
@@ -919,7 +919,7 @@ Security testing follows a **risk-based, threat-driven** approach aligned with O
 #### ST-13 — Audit Log Completeness and Sensitive Data Exclusion
 
 **Objective:** Verify that all security-relevant events are logged to ELK/SIEM and that no sensitive data (passwords, JWTs, file content) appears in logs.  
-**Linked Threats:** T-13, T-19 · **Abuse Case:** AC-09 · **SDR:** SDR-NEW-03, NFR-04 · **ASVS 5.0:** V7.1.1, V7.1.2, V7.2.1, V7.2.2, V7.3.2  
+**Linked Threats:** T-13, T-19 · **Abuse Case:** AC-09 · **SDR:** SDR-NEW-03, NFR-04   
 **Priority:** HIGH · **Method:** Integration test + Log review · **Phase:** Phase 2
 
 **Steps:**
@@ -937,7 +937,7 @@ Security testing follows a **risk-based, threat-driven** approach aligned with O
 #### ST-14 — Admin Endpoint Access Control
 
 **Objective:** Verify that admin endpoints are inaccessible to regular users and exposed only on the internal network.  
-**Linked Threats:** T-20 · **SDR:** SDR-02 · **ASVS 5.0:** V4.3.1  
+**Linked Threats:** T-20 · **SDR:** SDR-02   
 **Priority:** HIGH · **Method:** Integration test + Network scan · **Phase:** Phase 2
 
 **Steps:**
@@ -954,7 +954,7 @@ Security testing follows a **risk-based, threat-driven** approach aligned with O
 #### ST-15 — Dependency Vulnerability Scanning (SCA + SAST)
 
 **Objective:** Verify that no known CVEs exist in third-party dependencies and that SAST reports zero critical security issues.  
-**SDR:** SDR-07, SDR-08 · **ASVS 5.0:** V14.2.1  
+**SDR:** SDR-07, SDR-08   
 **Priority:** HIGH · **Method:** Automated CI scan (OWASP Dependency-Check, Snyk, SonarQube) · **Phase:** Every CI build
 
 **Steps:**
@@ -970,23 +970,23 @@ Security testing follows a **risk-based, threat-driven** approach aligned with O
 
 ### 11.4 Traceability Matrix
 
-| Test ID | Description | Abuse Case | SDR Requirements | ASVS 5.0 | Method | Priority |
-|---------|-------------|------------|-----------------|-----------|--------|----------|
-| ST-01 | Path Traversal via Upload | AC-02 | SDR-03, SDR-04 | V12.3.1, V5.1.3 | Integration + Manual | CRITICAL |
-| ST-02 | IDOR Cross-User Access | AC-04 | SDR-02 | V4.2.1 | Integration | CRITICAL |
-| ST-03 | Web Shell / RCE Upload | AC-03 | SDR-03, SDR-05 | V12.2.1 | Integration + Manual | CRITICAL |
-| ST-04 | Brute Force / Rate Limiting | AC-05 | SDR-10 | V2.2.1 | Integration + Hydra | HIGH |
-| ST-05 | JWT Algorithm Confusion | AC-01 | SDR-01, SDR-NEW-01 | V3.5.2, V3.2.2 | Manual + Unit | CRITICAL |
-| ST-06 | File Size / Quota DoS | AC-08 | SDR-05, SDR-NEW-07 | V12.2.3 | Integration + Locust | CRITICAL |
-| ST-07 | RBAC Role Escalation | AC-06 | SDR-02 | V4.2.2 | Integration | HIGH |
-| ST-08 | User Enumeration | AC-05 | SDR-01, SDR-09 | V2.2.5 | Manual + Burp Comparer | MEDIUM |
-| ST-09 | Security Headers / TLS | — | SDR-09 | V9.1.1, V9.1.2, V14.4.3–5 | Mozilla Observatory + testssl.sh | HIGH |
-| ST-10 | Password Hashing | — | SDR-06 | V2.4.1, V2.4.2 | Unit + SonarQube | HIGH |
-| ST-11 | SQL Injection | AC-07 | SDR-03 | V5.3.4 | DAST (ZAP) + FuzzDB + SAST | CRITICAL |
-| ST-12 | File Integrity | AC-10 | SDR-NEW-11 | V9.2.2 | Integration | HIGH |
-| ST-13 | Audit Log Completeness | AC-09 | SDR-NEW-03, NFR-04 | V7.1.1, V7.2.1, V7.3.2 | Integration + Log review | HIGH |
-| ST-14 | Admin Endpoint Exposure | — | SDR-02 | V4.3.1 | Integration + nmap | HIGH |
-| ST-15 | Dependency / SAST Scan | — | SDR-07, SDR-08 | V14.2.1 | OWASP DC + Snyk + SonarQube | HIGH |
+| Test ID | Description                     | Abuse Case | SDR Requirements           | Method                          | Priority |
+|---------|---------------------------------|------------|----------------------------|----------------------------------|----------|
+| ST-01   | Path Traversal via Upload       | AC-02      | SDR-03, SDR-04             | Integration + Manual             | CRITICAL |
+| ST-02   | IDOR Cross-User Access          | AC-04      | SDR-02                     | Integration                      | CRITICAL |
+| ST-03   | Web Shell / RCE Upload          | AC-03      | SDR-03, SDR-05             | Integration + Manual             | CRITICAL |
+| ST-04   | Brute Force / Rate Limiting     | AC-05      | SDR-10                     | Integration + Hydra              | HIGH     |
+| ST-05   | JWT Algorithm Confusion         | AC-01      | SDR-01, SDR-NEW-01         | Manual + Unit                    | CRITICAL |
+| ST-06   | File Size / Quota DoS           | AC-08      | SDR-05, SDR-NEW-07         | Integration + Locust             | CRITICAL |
+| ST-07   | RBAC Role Escalation            | AC-06      | SDR-02                     | Integration                      | HIGH     |
+| ST-08   | User Enumeration                | AC-05      | SDR-01, SDR-09             | Manual + Burp Comparer           | MEDIUM   |
+| ST-09   | Security Headers / TLS          | —          | SDR-09                     | Mozilla Observatory + testssl.sh | HIGH     |
+| ST-10   | Password Hashing                | —          | SDR-06                     | Unit + SonarQube                 | HIGH     |
+| ST-11   | SQL Injection                   | AC-07      | SDR-03                     | DAST (ZAP) + FuzzDB + SAST       | CRITICAL |
+| ST-12   | File Integrity                  | AC-10      | SDR-NEW-11                 | Integration                      | HIGH     |
+| ST-13   | Audit Log Completeness          | AC-09      | SDR-NEW-03, NFR-04         | Integration + Log review         | HIGH     |
+| ST-14   | Admin Endpoint Exposure         | —          | SDR-02                     | Integration + nmap               | HIGH     |
+| ST-15   | Dependency / SAST Scan          | —          | SDR-07, SDR-08             | OWASP DC + Snyk + SonarQube      | HIGH     |
 
 ### 11.5 Abuse Case Coverage
 
