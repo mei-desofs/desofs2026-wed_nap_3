@@ -21,12 +21,12 @@
 
 ## Team
 
-| # | Name | Student ID |
-|---|------|-----------|
-| 1 | \<name\> | \<id\> |
-| 2 | \<name\> | \<id\> |
-| 3 | \<name\> | \<id\> |
-| 4 | \<name\> | \<id\> |
+| # | Name               | Student ID |
+|---|--------------------|------------|
+| 1 | Tiago Miguel Silva | 1250554    |
+| 2 | Pedro Conceição    | 1211018    |
+| 3 | Tiago Queirós      | 1210910    |
+| 4 | \<name\>           | \<id\>     |
 
 ---
 
@@ -43,8 +43,7 @@
 9. [Mitigations](#9-mitigations)
 10. [Security Requirements](#10-security-requirements)
 11. [Security Testing Plan](#11-security-testing-plan)
-12. [ASVS Checklist](#12-asvs-checklist)
-13. [Phase 1 Summary](#13-phase-1-summary)
+13. [Phase 1 Summary](#12-phase-1-summary)
 
 ---
 
@@ -1005,9 +1004,9 @@ Security testing follows a **risk-based, threat-driven** approach aligned with O
 
 ---
 
-## 13. Phase 1 Summary
+## 12. Phase 1 Summary
 
-### 13.1 Main Findings
+### 12.1 Main Findings
 
 Phase 1 identified **20 threats** across all STRIDE categories. The four CRITICAL risks (DREAD ≥ 8.0) are all addressed by architectural design decisions:
 
@@ -1019,7 +1018,7 @@ Phase 1 identified **20 threats** across all STRIDE categories. The four CRITICA
 
 4. **Web Shell Upload (DREAD 8.2):** File type is validated via magic bytes (Apache Tika), ignoring the client-supplied Content-Type header. Files are stored outside the web root with no execute permissions, and UUID filenames prevent URL prediction.
 
-### 13.2 Key Architectural Controls Summary
+### 12.2 Key Architectural Controls Summary
 
 | Control | Threats Mitigated |
 |---------|------------------|
@@ -1036,7 +1035,7 @@ Phase 1 identified **20 threats** across all STRIDE categories. The four CRITICA
 | SHA-256 FileHash verified on every download | T-17 File Integrity |
 | HTTP security headers (HSTS, CSP, X-Frame-Options) | T-02, T-04 |
 
-### 13.3 Open Items for Phase 2
+### 12.3 Open Items for Phase 2
 
 | Item | Priority |
 |------|---------|
