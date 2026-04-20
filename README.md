@@ -8,7 +8,6 @@
 | 2       | Pedro Conceição | 1211018   |
 | 3       | Tiago Silva | 1250554   |
 | 4       | Gonçalo Costa | 1201062   |
-> Please edit this table to include your real names and student IDs.
 
 ## Overview
 
