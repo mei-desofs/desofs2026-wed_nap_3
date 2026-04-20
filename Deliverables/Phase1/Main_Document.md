@@ -257,7 +257,8 @@ The Level 0 diagram treats the entire system as a **single black-box process**. 
 
 | Boundary | Meaning |
 |----------|---------|
-| Internet (Untrusted) | Where Users and Administrators originate. All inbound traffic must use HTTPS/TLS and carry a valid JWT. |
+| Internet (Untrusted) | Where Users originate. All inbound traffic must use HTTPS/TLS and carry a valid JWT. |
+| Internet (Untrusted) — Admin | Same logical zone as Internet (Untrusted); kept separate to make Administrator traffic explicitly visible as untrusted internet traffic subject to the same JWT auth and TLS requirements. |
 | External Systems | Where third-party systems receiving outbound data live. Audit logs cross here over HTTPS/TLS with API key. |
 
 **Data Flows (Level 0):**
@@ -295,7 +296,8 @@ Level 1 decomposes the black-box into its internal process, data stores, and all
 
 | Boundary | Separates | Key Controls Enforced |
 |----------|-----------|-----------------------|
-| A — Internet / Application | Untrusted actors from the Spring Boot process | HTTPS/TLS 1.3, JWT authentication, input validation |
+| A — Internet / Application | Untrusted actors (User) from the Spring Boot process | HTTPS/TLS 1.3, JWT authentication, input validation |
+| A (Admin) — Internet / Application (Admin) | Administrator from the Spring Boot process | Same as Boundary A; separate object to make admin traffic explicitly visible as untrusted internet traffic subject to JWT auth |
 | B — Application / Infrastructure | Spring Boot from data stores (PostgreSQL + FS) | JDBC prepared statements, Java NIO path normalisation, DML-only DB user |
 | C — Application / External Log | Application from ELK/SIEM | HTTPS/TLS 1.3, API key authentication |
 
@@ -421,11 +423,29 @@ Level 2 decomposes the **File Service sub-system** — the highest threat-densit
 | **T-06** | T | **Malicious File Upload / Web Shell** — Attacker uploads an executable file (JSP, PHP, shell script) by spoofing the Content-Type header, enabling Remote Code Execution. | External attacker | Upload file with `Content-Type: image/jpeg` but actual content is a JSP/PHP script. |
 | **T-07** | E | **IDOR — Broken Object Level Authorisation** — Authenticated user accesses or modifies another user's resources by manipulating the resourceId in the URL. | Authenticated malicious user | Change `fileId` UUID in `GET /files/{fileId}` to another user's UUID. |
 
+#### Data Flow: DF-04 — File Download
+
+| Threat ID | STRIDE | Description | Threat Agent | Attack Vector |
+|-----------|--------|-------------|--------------|---------------|
+| **T-07** | E | **IDOR — Broken Object Level Authorisation** — Authenticated user accesses another user's file by manipulating the fileId UUID in the URL. | Authenticated malicious user | Change `fileId` UUID in `GET /files/{fileId}` to another user's UUID; authenticated but not authorised. |
+
+#### Data Flow: DF-06 — File Delete
+
+| Threat ID | STRIDE | Description | Threat Agent | Attack Vector |
+|-----------|--------|-------------|--------------|---------------|
+| **T-09** | E | **Role Abuse — EDITOR Performs DELETE** — EDITOR role should not be able to delete; absent RBAC enforcement at the endpoint level allows it. | Authenticated EDITOR | Send `DELETE /files/{fileId}` with a valid EDITOR JWT. |
+
 #### Data Flow: DF-08 — Folder Operations
 
 | Threat ID | STRIDE | Description | Threat Agent | Attack Vector |
 |-----------|--------|-------------|--------------|---------------|
 | **T-05b** | T | **Path Traversal in Folder Operations** — Attacker manipulates the folder name or path parameter to escape the storage directory during folder create, rename, or delete. | External attacker | `folderName = "../../etc"` or traversal sequences in PUT/DELETE path parameter. |
+
+#### Data Flow: DF-09 — Admin User Management
+
+| Threat ID | STRIDE | Description | Threat Agent | Attack Vector |
+|-----------|--------|-------------|--------------|---------------|
+| **T-20** | E | **Admin Endpoint Access without Admin Role** — Regular user attempts to access admin-only endpoints by sending requests with a non-Admin JWT. | Authenticated regular user | Send `GET /admin/users` with a valid non-Admin JWT; or access `/actuator/env` from an external IP. |
 
 #### Data Flows: DF-10/DF-11 — Application ↔ PostgreSQL
 
@@ -440,6 +460,13 @@ Level 2 decomposes the **File Service sub-system** — the highest threat-densit
 |-----------|--------|-------------|--------------|---------------|
 | **T-17** | T | **File Integrity Tampering on Disk** — Attacker with OS-level access modifies a binary file after storage, making it appear legitimate when downloaded. | Insider / OS-level attacker | Directly modify `/srv/files/{uuid}` on the server filesystem outside the application. |
 | **T-18** | D | **Disk Exhaustion** — Attacker fills the file storage partition, preventing new uploads and potentially crashing the application. | External attacker / authenticated user | Upload many large files until disk space runs out. |
+
+#### Data Store: Physical File System
+
+| Threat ID | STRIDE | Description | Threat Agent | Attack Vector |
+|-----------|--------|-------------|--------------|---------------|
+| **T-17** | T | **File Integrity Tampering on Disk** — Stored binary files modified directly on disk outside the application. | Insider / OS-level attacker | Locate UUID-named file in `/srv/files/` and modify its bytes directly, bypassing the API. |
+| **T-18** | D | **Disk Exhaustion** — Storage partition filled by excessive uploads without per-user quota enforcement. | External attacker / authenticated user | Upload many large files until the filesystem partition is full. |
 
 #### Data Store: PostgreSQL Database
 
@@ -485,6 +512,8 @@ Level 2 decomposes the **File Service sub-system** — the highest threat-densit
 | T-18 | D | Disk Exhaustion (DoS) | CRITICAL |
 | T-19 | I | Sensitive Data in Audit Logs | MEDIUM |
 | T-20 | E | Admin Endpoint Exposure | HIGH |
+
+> 📄 Full STRIDE coverage matrix (all DFD elements including Level 2 sub-processes P2.1–P2.4): [Threat_modeling.md — Section 5](./Threat_modeling.md)
 
 ---
 
