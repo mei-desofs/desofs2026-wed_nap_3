@@ -711,7 +711,7 @@ This section consolidates all security requirements (from Section 4.3) with thei
 
 ### 11.1 Testing Methodology
 
-Security testing follows a **risk-based, threat-driven** approach aligned with OWASP ASVS 5.0 Level 2. The strategy combines multiple complementary techniques executed at different points in the delivery pipeline:
+Security testing follows a **risk-based, threat-driven** approach aligned with OWASP ASVS 5.0. The strategy combines multiple complementary techniques executed at different points in the delivery pipeline:
 
 | Layer | Technique | Tool(s) | Trigger |
 |-------|-----------|---------|---------|
