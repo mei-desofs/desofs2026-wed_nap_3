@@ -21,15 +21,6 @@
 | **D** | Denial of Service | Availability |
 | **E** | Elevation of Privilege | Authorisation |
 
-**STRIDE applicability per element type:**
-
-| Element | S | T | R | I | D | E |
-|---------|---|---|---|---|---|---|
-| External Entity | ✅ | | ✅ | | | |
-| Process | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Data Store | | ✅ | ✅ | ✅ | ✅ | |
-| Data Flow | ✅ | ✅ | | ✅ | ✅ | |
-
 ---
 
 ## 2. STRIDE Analysis per DFD Element
