@@ -104,13 +104,14 @@ Security is foundational to this project: the system manages potentially sensiti
 
 ### 2.1 Architecture Description
 
-Ender Chest is a **Spring Boot monolith** exposing a REST API over HTTPS. It communicates with two internal data stores and one external system:
+Ender Chest is a **Spring Boot monolith** exposing a REST API over HTTPS. It communicates with two internal data stores and two external systems:
 
 | Component | Role | Technology |
 |-----------|------|-----------|
-| REST Client (Browser / App) | External actor; sends HTTP requests | Browser / any HTTP client |
-| Spring Boot Application | Single process — authentication, RBAC, file/folder ops, OS I/O, audit | Spring Boot 3.x, Java 21 |
-| PostgreSQL | Relational store for all domain metadata and access control records | PostgreSQL 16 |
+| REST Client (Browser / App) | External actor; sends HTTP requests over HTTPS | Browser / any HTTP client |
+| Spring Boot Application | Core process — handles business logic, RBAC authorization, file/folder ops, OS-level I/O, and audit | Spring Boot 3.x, Java 21 |
+| Identity Provider | External authentication service; issues and validates identity tokens; Spring Boot delegates authentication to this component | External IdP |
+| PostgreSQL | Relational store for domain metadata, UUIDs, and user roles | PostgreSQL 16 |
 | Physical File System | Binary file storage — UUID-named files, outside web root | Server OS, Java NIO |
 | External Log System (ELK / SIEM) | Immutable audit trail — receives structured JSON events in real time | ELK / external SIEM |
 
@@ -119,12 +120,13 @@ Ender Chest is a **Spring Boot monolith** exposing a REST API over HTTPS. It com
 ![Architecture Diagram](./assets/architecture_diagram.png)
 > 🗂️ Mermaid source: [Architecture_Diagram.mmd](./Architecture_Diagram.mmd)
 
-The diagram shows the physical deployment view: the REST client communicates with the Spring Boot backend over HTTPS. The backend uses JDBC to access PostgreSQL and Java NIO for OS-level file I/O. Audit logs are forwarded to the external log system over HTTPS with API-key authentication.
+The diagram shows the physical deployment view. The REST client communicates with the Spring Boot backend over HTTPS. Authentication is delegated to an external Identity Provider via an Authentication channel. The backend uses JDBC to access PostgreSQL (which stores metadata, UUIDs, and user roles) and Java NIO for OS-level file I/O against the Physical File System (binary files named with generated UUIDs to prevent path traversal). Audit logs are forwarded to the external log system over HTTPS with API-key authentication. The Spring Boot application itself handles logic, authorization, and all OS-level actions.
 
 ### 2.3 Key Security Design Decisions
 
 | Decision | Rationale |
 |----------|-----------|
+| External Identity Provider for authentication | Authentication is delegated to a dedicated Identity Provider, decoupling auth from business logic and reducing the attack surface of the Spring Boot application |
 | UUID as physical filename | The user-supplied filename is **never** used as a file system path component, eliminating path traversal at the storage layer |
 | Metadata in DB, binary on FS | Separates concerns; access checks on metadata before any OS I/O |
 | AccessShare checked before every OS operation | Authorization-first: if no AccessShare record exists for the caller and resourceId, the operation is rejected before touching the file system |
