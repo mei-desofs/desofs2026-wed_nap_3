@@ -204,23 +204,24 @@ The domain model follows Domain-Driven Design (DDD) principles and is organised 
 
 ### 4.3 Secure Development Requirements (SDR)
 
-| ID | Description | Priority |
-|----|-------------|---------|
-| **SDR-01** | Authentication via JWT with expiration time and a refresh token mechanism. | MUST |
-| **SDR-02** | Role-Based Access Control (RBAC) — access to each resource must be strictly verified before any operation is executed. | MUST |
-| **SDR-03** | Strict validation and sanitisation of all inputs received by the API (filenames, paths, MIME types). | MUST |
-| **SDR-04** | Path traversal prevention — file paths must be normalised and strictly confined to the base storage directory. | MUST |
-| **SDR-05** | Limit the size and type of files accepted during upload to prevent DoS attacks. | MUST |
-| **SDR-06** | Passwords must be stored using a secure cryptographic hash (BCrypt or Argon2) — never in plaintext. | MUST |
-| **SDR-07** | Third-party dependencies managed with SCA (OWASP Dependency-Check) and updated regularly. | SHOULD |
-| **SDR-08** | SAST integrated into the CI/CD pipeline (SonarQube, Semgrep). | SHOULD |
-| **SDR-09** | Secure server configuration — HTTP security headers (CSP, HSTS, X-Frame-Options) active by default. | MUST |
-| **SDR-10** | Rate limiting on API endpoints to mitigate brute force and DDoS attacks. | MUST |
-| **SDR-NEW-01** | JWT algorithm whitelist — server explicitly rejects `alg: none` and non-whitelisted algorithms. | MUST |
+| ID | Description                                                                                                                     | Priority |
+|----|---------------------------------------------------------------------------------------------------------------------------------|---------|
+| **SDR-01** | Authentication via JWT with expiration time and a refresh token mechanism.                                                      | MUST |
+| **SDR-02** | Role-Based Access Control (RBAC) — access to each resource must be strictly verified before any operation is executed.          | MUST |
+| **SDR-03** | Strict validation and sanitisation of all inputs received by the API (filenames, paths, MIME types).                            | MUST |
+| **SDR-04** | Path traversal prevention — file paths must be normalised and strictly confined to the base storage directory.                  | MUST |
+| **SDR-05** | Limit the size and type of files accepted during upload to prevent DoS attacks.                                                 | MUST |
+| **SDR-06** | Passwords must be stored using a secure cryptographic hash (BCrypt or Argon2) — never in plaintext.                             | MUST |
+| **SDR-07** | Third-party dependencies managed with SCA (OWASP Dependency-Check) and updated regularly.                                       | SHOULD |
+| **SDR-08** | SAST integrated into the CI/CD pipeline (SonarQube, Semgrep).                                                                   | SHOULD |
+| **SDR-09** | Secure server configuration — HTTP security headers (CSP, HSTS, X-Frame-Options) active by default.                             | MUST |
+| **SDR-10** | Rate limiting on API endpoints to mitigate brute force and DDoS attacks.                                                        | MUST |
+| **SDR-NEW-01** | JWT algorithm whitelist — server explicitly rejects `alg: none` and non-whitelisted algorithms.                                 | MUST |
 | **SDR-NEW-03** | Audit log events forwarded to external ELK/SIEM over HTTPS/TLS with API key authentication **before** the response is returned. | MUST |
-| **SDR-NEW-06** | Production DB user has DML-only permissions (SELECT, INSERT, UPDATE, DELETE) — no DDL, no TRUNCATE. | MUST |
-| **SDR-NEW-07** | Per-user StorageQuota enforced at upload time; reject upload if quota would be exceeded. | MUST |
-| **SDR-NEW-11** | SHA-256 FileHash stored in FileVersion and verified on every download; abort and alert on mismatch. | MUST |
+| **SDR-NEW-06** | Production DB user has DML-only permissions (SELECT, INSERT, UPDATE, DELETE) — no DDL, no TRUNCATE.                             | MUST |
+| **SDR-NEW-07** | Per-user StorageQuota enforced at upload time; reject upload if quota would be exceeded.                                        | MUST |
+| **SDR-NEW-11** | SHA-256 FileHash stored in FileVersion and verified on every download; abort and alert on mismatch.                             | MUST |
+| **SDR-NEW-12** | Audit log events must never contain passwords, tokens, or file content                                                          | MUST |
 
 ---
 
@@ -673,7 +674,7 @@ The following table maps each high-priority risk to the specific architectural c
 | RISK-07 Role Abuse | T-09 | RBAC matrix enforced: DELETE is OWNER-only; EDITOR/VIEWER receive HTTP 403; soft delete limits damage | SDR-02 |
 | RISK-10 Log Tampering | T-13 | All audit events forwarded to external ELK/SIEM over HTTPS/TLS with API key before response is returned; logs not stored exclusively locally | FR-08, SDR-NEW-03 |
 | RISK-11 File Integrity | T-17 | SHA-256 FileHash stored in FileVersion at upload time; verified on every download in P2.2; abort and log `DOWNLOAD_INTEGRITY_FAIL` on mismatch | SDR-NEW-11 |
-| RISK-13 Sensitive Logs | T-19 | Audit event schema: only timestamp, userId, action, resourceId, resourceType, sourceIP, outcome — no passwords, tokens, or file content | NFR-04 |
+| RISK-13 Sensitive Logs | T-19 | Audit event schema: only timestamp, userId, action, resourceId, resourceType, sourceIP, outcome — no passwords, tokens, or file content | SDR-NEW-12 |
 | T-02 TLS Downgrade | T-02 | HTTPS/TLS 1.3 enforced; HSTS with long max-age; HTTP connections rejected | SDR-09, NFR-01 |
 | T-03 Repudiation | T-03 | Structured audit log with userId, action, resourceId, timestamp, sourceIP forwarded before response | FR-08 |
 
@@ -956,7 +957,7 @@ Security testing follows a **risk-based, threat-driven** approach aligned with O
 #### ST-13 — Audit Log Completeness and Sensitive Data Exclusion
 
 **Objective:** Verify that all security-relevant events are logged to ELK/SIEM and that no sensitive data (passwords, JWTs, file content) appears in logs.  
-**Linked Threats:** T-13, T-19 · **Abuse Case:** AC-09 · **SDR:** SDR-NEW-03, NFR-04   
+**Linked Threats:** T-13, T-19 · **Abuse Case:** AC-09 · **SDR:** SDR-NEW-03, NFR-04, SDR-NEW-12
 **Priority:** HIGH · **Method:** Integration test + Log review · **Phase:** Phase 2
 
 **Steps:**
@@ -1007,23 +1008,23 @@ Security testing follows a **risk-based, threat-driven** approach aligned with O
 
 ### 11.4 Traceability Matrix
 
-| Test ID | Description                     | Abuse Case | SDR Requirements           | Method                          | Priority |
-|---------|---------------------------------|------------|----------------------------|----------------------------------|----------|
-| ST-01   | Path Traversal via Upload       | AC-02      | SDR-03, SDR-04             | Integration + Manual             | CRITICAL |
-| ST-02   | IDOR Cross-User Access          | AC-04      | SDR-02                     | Integration                      | CRITICAL |
-| ST-03   | Web Shell / RCE Upload          | AC-03      | SDR-03, SDR-05             | Integration + Manual             | CRITICAL |
-| ST-04   | Brute Force / Rate Limiting     | AC-05      | SDR-10                     | Integration + Hydra              | HIGH     |
-| ST-05   | JWT Algorithm Confusion         | AC-01      | SDR-01, SDR-NEW-01         | Manual + Unit                    | CRITICAL |
-| ST-06   | File Size / Quota DoS           | AC-08      | SDR-05, SDR-NEW-07         | Integration + Locust             | CRITICAL |
-| ST-07   | RBAC Role Escalation            | AC-06      | SDR-02                     | Integration                      | HIGH     |
-| ST-08   | User Enumeration                | AC-05      | SDR-01, SDR-09             | Manual + Burp Comparer           | MEDIUM   |
-| ST-09   | Security Headers / TLS          | —          | SDR-09                     | Mozilla Observatory + testssl.sh | HIGH     |
-| ST-10   | Password Hashing                | —          | SDR-06                     | Unit + SonarQube                 | HIGH     |
-| ST-11   | SQL Injection                   | AC-07      | SDR-03                     | DAST (ZAP) + FuzzDB + SAST       | CRITICAL |
-| ST-12   | File Integrity                  | AC-10      | SDR-NEW-11                 | Integration                      | HIGH     |
-| ST-13   | Audit Log Completeness          | AC-09      | SDR-NEW-03, NFR-04         | Integration + Log review         | HIGH     |
-| ST-14   | Admin Endpoint Exposure         | —          | SDR-02                     | Integration + nmap               | HIGH     |
-| ST-15   | Dependency / SAST Scan          | —          | SDR-07, SDR-08             | OWASP DC + Snyk + SonarQube      | HIGH     |
+| Test ID | Description                     | Abuse Case | SDR Requirements     | Method                          | Priority |
+|---------|---------------------------------|------------|----------------------|----------------------------------|----------|
+| ST-01   | Path Traversal via Upload       | AC-02      | SDR-03, SDR-04       | Integration + Manual             | CRITICAL |
+| ST-02   | IDOR Cross-User Access          | AC-04      | SDR-02               | Integration                      | CRITICAL |
+| ST-03   | Web Shell / RCE Upload          | AC-03      | SDR-03, SDR-05       | Integration + Manual             | CRITICAL |
+| ST-04   | Brute Force / Rate Limiting     | AC-05      | SDR-10               | Integration + Hydra              | HIGH     |
+| ST-05   | JWT Algorithm Confusion         | AC-01      | SDR-01, SDR-NEW-01   | Manual + Unit                    | CRITICAL |
+| ST-06   | File Size / Quota DoS           | AC-08      | SDR-05, SDR-NEW-07   | Integration + Locust             | CRITICAL |
+| ST-07   | RBAC Role Escalation            | AC-06      | SDR-02               | Integration                      | HIGH     |
+| ST-08   | User Enumeration                | AC-05      | SDR-01, SDR-09       | Manual + Burp Comparer           | MEDIUM   |
+| ST-09   | Security Headers / TLS          | —          | SDR-09               | Mozilla Observatory + testssl.sh | HIGH     |
+| ST-10   | Password Hashing                | —          | SDR-06               | Unit + SonarQube                 | HIGH     |
+| ST-11   | SQL Injection                   | AC-07      | SDR-03               | DAST (ZAP) + FuzzDB + SAST       | CRITICAL |
+| ST-12   | File Integrity                  | AC-10      | SDR-NEW-11           | Integration                      | HIGH     |
+| ST-13   | Audit Log Completeness          | AC-09      | SDR-NEW-03, NFR-04, SDR-NEW-12 | Integration + Log review         | HIGH     |
+| ST-14   | Admin Endpoint Exposure         | —          | SDR-02               | Integration + nmap               | HIGH     |
+| ST-15   | Dependency / SAST Scan          | —          | SDR-07, SDR-08       | OWASP DC + Snyk + SonarQube      | HIGH     |
 
 ### 11.5 Abuse Case Coverage
 

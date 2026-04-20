@@ -113,7 +113,7 @@ Each dimension is scored on a scale of **1–10**:
 | **D**iscoverability | 7 | Any publicly exposed login endpoint is a known target. |
 | **DREAD Score** | **7.6** | **HIGH** |
 
-**Mitigations:** Rate limiting on `/auth/login`; account lockout (IsLocked); generic error messages (SDR-10, SDR-01).
+**Mitigations:** Rate limiting on `/auth/login`; account lockout (IsLocked); generic error messages (SDR-10, SDR-09).
 
 ---
 
@@ -241,7 +241,7 @@ Each dimension is scored on a scale of **1–10**:
 | **D**iscoverability | 2 | Requires log system access; not externally discoverable. |
 | **DREAD Score** | **4.8** | **MEDIUM** |
 
-**Mitigations:** Audit event schema explicitly excludes passwords, tokens, file content (RNF-04).
+**Mitigations:** Audit event schema explicitly excludes passwords, tokens, file content (SDR-NEW-12).
 
 ---
 
@@ -277,7 +277,7 @@ Each dimension is scored on a scale of **1–10**:
 
 > **Note:** Reclassified to HIGH due to very high reproducibility, exploitability, and discoverability. Even though damage potential is low in isolation, it significantly facilitates brute force (T-10).
 
-**Mitigations:** Return identical generic error message `"Invalid credentials"` for both cases.
+**Mitigations:** Return identical generic error message `"Invalid credentials"` for both cases (SDR-09).
 
 ---
 
