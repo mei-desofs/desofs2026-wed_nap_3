@@ -4,7 +4,7 @@
 **Group:** WED\_NAP\_3  
 **Repository:** `desofs2026-wed_nap_3`  
 **Phase:** 1  
-**Last updated:** 2026-04-18
+**Last updated:** 2026-04-20
 
 ---
 
@@ -27,6 +27,26 @@
 | 2 | Pedro Conceição    | 1211018    |
 | 3 | Tiago Queirós      | 1210910    |
 | 4 | \<name\>           | \<id\>     |
+
+---
+
+## Repository Artefacts
+
+All Phase 1 documentation artefacts are located in the same directory as this document. The table below maps each section to its dedicated source file:
+
+| Section | Source File |
+|---------|-------------|
+| System Overview & Architecture | [System_Overview.md](./System_Overview.md) |
+| Architecture Diagram (Mermaid source) | [Architecture_Diagram.mmd](./Architecture_Diagram.mmd) |
+| Domain Model (Mermaid source) | [Domain_model.mmd](./Domain_model.mmd) |
+| Requirements | [Requirements.md](./Requirements.md) |
+| Data Flow Diagrams | [DFDs.md](./DFDs.md) · [DFD/](./DFD/) |
+| Threat Modeling (STRIDE) | [Threat_modeling.md](./Threat_modeling.md) |
+| Abuse Cases | [Abuses_Cases.md](./Abuses_Cases.md) |
+| Risk Assessment (DREAD) | [Risk_Assessment.md](./Risk_Assessment.md) |
+| Security Testing Plan | [Security_Testing.md](./Security_Testing.md) |
+| ASVS Checklist (Markdown) | [ASVS_Checklist.md](./ASVS_Checklist.md) |
+| ASVS Tracker (Excel) | [ASVS_5_0_Tracker_filled.xlsx](./ASVS_5_0_Tracker_filled.xlsx) |
 
 ---
 
@@ -80,6 +100,8 @@ Security is foundational to this project: the system manages potentially sensiti
 
 ## 2. System Overview & Architecture
 
+> 📄 Full detail: [System_Overview.md](./System_Overview.md)
+
 ### 2.1 Architecture Description
 
 Ender Chest is a **Spring Boot monolith** exposing a REST API over HTTPS. It communicates with two internal data stores and one external system:
@@ -95,6 +117,7 @@ Ender Chest is a **Spring Boot monolith** exposing a REST API over HTTPS. It com
 ### 2.2 Architecture Diagram
 
 ![Architecture Diagram](./assets/architecture_diagram.png)
+> 🗂️ Mermaid source: [Architecture_Diagram.mmd](./Architecture_Diagram.mmd)
 
 The diagram shows the physical deployment view: the REST client communicates with the Spring Boot backend over HTTPS. The backend uses JDBC to access PostgreSQL and Java NIO for OS-level file I/O. Audit logs are forwarded to the external log system over HTTPS with API-key authentication.
 
@@ -115,11 +138,14 @@ The diagram shows the physical deployment view: the REST client communicates wit
 
 ## 3. Domain Model (DDD)
 
+> 📄 Full detail: [Domain_model.mmd](./Domain_model.mmd)
+
 ### 3.1 Aggregates
 
 The domain model follows Domain-Driven Design (DDD) principles and is organised around **five aggregate roots**:
 
 ![Domain Model](./assets/domain_model.png)
+> 🗂️ Mermaid source: [Domain_model.mmd](./Domain_model.mmd)
 
 | Aggregate Root | Key Attributes | Security Notes |
 |----------------|---------------|----------------|
@@ -149,6 +175,8 @@ The domain model follows Domain-Driven Design (DDD) principles and is organised 
 ---
 
 ## 4. Requirements
+
+> 📄 Full detail: [Requirements.md](./Requirements.md)
 
 ### 4.1 Functional Requirements (FR)
 
@@ -197,6 +225,8 @@ The domain model follows Domain-Driven Design (DDD) principles and is organised 
 ---
 
 ## 5. Data Flow Diagrams (DFDs)
+
+> 📄 Full detail: [DFDs.md](./DFDs.md) · 🗂️ DFD image assets: [DFD/](./DFD/)
 
 DFDs were produced using [pytm](https://github.com/OWASP/pytm) and follow the standard notation:
 
@@ -347,6 +377,8 @@ Level 2 decomposes the **File Service sub-system** — the highest threat-densit
 
 ## 6. Threat Modeling (STRIDE)
 
+> 📄 Full detail: [Threat_modeling.md](./Threat_modeling.md)
+
 ### 6.1 Methodology
 
 **STRIDE per DFD element** is applied to all processes, data stores, and data flows at Level 1 and Level 2.
@@ -457,6 +489,8 @@ Level 2 decomposes the **File Service sub-system** — the highest threat-densit
 
 ## 7. Abuse Cases
 
+> 📄 Full detail: [Abuses_Cases.md](./Abuses_Cases.md)
+
 Abuse cases describe how a malicious actor exploits the system's functionality. They complement the functional requirements and are derived from the STRIDE threats identified above.
 
 ### AC-01 — JWT Algorithm Confusion Attack (T-01)
@@ -560,6 +594,8 @@ Abuse cases describe how a malicious actor exploits the system's functionality. 
 ---
 
 ## 8. Risk Assessment (DREAD)
+
+> 📄 Full detail: [Risk_Assessment.md](./Risk_Assessment.md)
 
 ### 8.1 DREAD Methodology
 
@@ -668,6 +704,8 @@ This section consolidates all security requirements (from Section 4.3) with thei
 ---
 
 ## 11. Security Testing Plan
+
+> 📄 Full detail: [Security_Testing.md](./Security_Testing.md)
 
 > **Shift-left note:** All test cases in this section are defined during Phase 1 (design). No code exists yet. Execution is planned for Phase 2 sprints. Defining tests now ensures every security requirement has a concrete verification method before implementation begins.
 
@@ -1004,7 +1042,29 @@ Security testing follows a **risk-based, threat-driven** approach aligned with O
 
 ---
 
-## 12. Phase 1 Summary
+---
+
+## 12. ASVS Assessment
+
+> 📋 Checklist summary: [ASVS_Checklist.md](./ASVS_Checklist.md)  
+> 📊 Full tracker (Excel): [ASVS_5_0_Tracker_filled.xlsx](./ASVS_5_0_Tracker_filled.xlsx)
+
+The OWASP Application Security Verification Standard (ASVS) 5.0 Level 2 has been used as the primary security guideline for this project. The tracker covers all 17 chapters (345 requirements total). Phase 1 focuses on architecture-relevant chapters; implementation-dependent items are deferred to Phase 2 sprints.
+
+| Chapter | Scope for Phase 1 |
+|---------|-------------------|
+| V5 – File Handling | Core to system — fully assessed |
+| V8 – Authorization | Core to system — fully assessed |
+| V9 – Self-contained Tokens | Core to system — fully assessed |
+| V16 – Security Logging | Core to system — fully assessed |
+| V6 – Authentication | Architecture defined; implementation deferred to Phase 2 |
+| V12 – Secure Communication | TLS/HSTS controls defined; validated in Phase 2 |
+| V10 – OAuth and OIDC | Not Applicable — internal JWT used |
+| V17 – WebRTC | Not Applicable — not in scope |
+
+---
+
+## 13. Phase 1 Summary
 
 ### 12.1 Main Findings
 
