@@ -464,27 +464,27 @@ Level 2 decomposes the **File Service sub-system** — the highest threat-densit
 ### 6.3 Threat Summary
 
 | ID | STRIDE | Description | Priority |
-|----|--------|-------------|---------|
-| T-01 | S | JWT Algorithm Confusion | HIGH |
-| T-02 | T | TLS Downgrade / MITM | HIGH |
-| T-03 | R | Action Repudiation | MEDIUM |
-| T-04 | I | Internal Error Information Disclosure | HIGH |
+|----|--------|-------------|----------|
+| T-01 | S | JWT Algorithm Confusion | HIGH     |
+| T-02 | T | TLS Downgrade / MITM | HIGH     |
+| T-03 | R | Action Repudiation | HIGH     |
+| T-04 | I | Internal Error Information Disclosure | HIGH     |
 | T-05 | T | Path Traversal (upload + folder ops) | CRITICAL |
 | T-06 | T | Malicious File Upload / Web Shell | CRITICAL |
 | T-07 | E | IDOR — Object-level Authorisation Bypass | CRITICAL |
 | T-08 | D | DoS via Large File Uploads | CRITICAL |
-| T-09 | E | Role Abuse (EDITOR performs DELETE) | HIGH |
-| T-10 | S | Credential Brute Force / Stuffing | HIGH |
+| T-09 | E | Role Abuse (EDITOR performs DELETE) | HIGH     |
+| T-10 | S | Credential Brute Force / Stuffing | HIGH     |
 | T-11 | T | SQL Injection | CRITICAL |
-| T-12 | I | Sensitive Data in Error Messages | HIGH |
-| T-13 | R | Log Tampering / No Audit Trail | HIGH |
-| T-14 | I | Weak Password Storage | HIGH |
-| T-15 | I | Excessive DB Privileges | HIGH |
-| T-16 | I | User Enumeration via Login Error | HIGH |
-| T-17 | T | File Integrity Tampering on Disk | MEDIUM |
+| T-12 | I | Sensitive Data in Error Messages | HIGH     |
+| T-13 | R | Log Tampering / No Audit Trail | HIGH     |
+| T-14 | I | Weak Password Storage | HIGH     |
+| T-15 | I | Excessive DB Privileges | HIGH     |
+| T-16 | I | User Enumeration via Login Error | HIGH     |
+| T-17 | T | File Integrity Tampering on Disk | MEDIUM   |
 | T-18 | D | Disk Exhaustion (DoS) | CRITICAL |
-| T-19 | I | Sensitive Data in Audit Logs | MEDIUM |
-| T-20 | E | Admin Endpoint Exposure | HIGH |
+| T-19 | I | Sensitive Data in Audit Logs | MEDIUM   |
+| T-20 | E | Admin Endpoint Exposure | HIGH     |
 
 ---
 
@@ -631,26 +631,34 @@ Abuse cases describe how a malicious actor exploits the system's functionality. 
 | **RISK-10** | T-13 Log Tampering | 8 | 5 | 4 | 7 | 3 | **5.4** | HIGH |
 | **RISK-13** | T-19 Sensitive Logs | 7 | 4 | 3 | 8 | 2 | **4.8** | MEDIUM |
 | **RISK-11** | T-17 File Integrity | 8 | 4 | 3 | 6 | 2 | **4.6** | MEDIUM |
+| **RISK-16** | T-02 TLS Downgrade | 8 | 6 | 5 | 10 | 7 | **7.2** | HIGH |
+| **RISK-17** | T-03 Repudiation | 4 | 7 | 8 | 3 | 3 | **5.0** | HIGH |
+| **RISK-18** | T-12 Error Messages | 4 | 8 | 8 | 3 | 7 | **6.0** | HIGH |
+| **RISK-19** | T-15 Excessive DB Privileges | 8 | 5 | 4 | 10 | 4 | **6.2** | HIGH |
 
 ### 8.3 Prioritised Risk Register
 
 | Priority | Risk ID | DREAD Score | Level | Key Mitigation |
 |----------|---------|-------------|-------|----------------|
-| 1        | RISK-03 — IDOR | **9.0** | CRITICAL | AccessShare object-level check per resourceId |
-| 2        | RISK-01 — Path Traversal | **8.8** | CRITICAL | UUID physical names; `Path.normalize()` + base-dir check |
-| 3        | RISK-04 — SQL Injection | **8.8** | CRITICAL | Prepared statements exclusively; DML-only DB user |
-| 4        | RISK-02 — Web Shell Upload | **8.2** | CRITICAL | Magic-byte MIME validation; out-of-webroot storage |
-| 5        | RISK-09 — DoS Upload | **7.8** | CRITICAL | Max file size; StorageQuota; rate limiting |
-| 6        | RISK-05 — Brute Force | **7.6** | HIGH | Rate limit; account lockout (IsLocked) |
-| 7        | RISK-06 — JWT Spoofing | **7.2** | HIGH | Algorithm whitelist; reject `alg: none` |
-| 8        | RISK-08 — Weak Passwords | **7.0** | HIGH | BCrypt / Argon2 |
-| 9        | RISK-14 — Admin Exposure | **7.0** | HIGH | Network restriction; JWT Admin role required |
-| 10       | RISK-07 — Role Abuse | **6.6** | HIGH | RBAC matrix: DELETE OWNER-only |
-| 11       | RISK-15 — User Enumeration | **6.0** | HIGH | Generic error message for all login failures |
-| 12       | RISK-12 — Error Disclosure | **6.0** | HIGH | Global exception handler; no stack traces |
-| 13 | RISK-10 — Log Tampering | **5.4** | HIGH | External ELK/SIEM; real-time forwarding |
-| 14 | RISK-13 — Sensitive Logs | **4.8** | MEDIUM | Audit event schema excludes sensitive fields |
-| 15 | RISK-11 — File Integrity | **4.6** | MEDIUM | SHA-256 FileHash verified on every download |
+| 1  | RISK-03 — IDOR | **9.0** | CRITICAL | AccessShare object-level check per resourceId |
+| 2  | RISK-01 — Path Traversal | **8.8** | CRITICAL | UUID physical names; `Path.normalize()` + base-dir check |
+| 3  | RISK-04 — SQL Injection | **8.8** | CRITICAL | Prepared statements exclusively; DML-only DB user |
+| 4  | RISK-02 — Web Shell Upload | **8.2** | CRITICAL | Magic-byte MIME validation; out-of-webroot storage |
+| 5  | RISK-09 — DoS Upload | **7.8** | CRITICAL | Max file size; StorageQuota; rate limiting |
+| 6  | RISK-05 — Brute Force | **7.6** | HIGH | Rate limit; account lockout (IsLocked) |
+| 7  | RISK-06 — JWT Spoofing | **7.2** | HIGH | Algorithm whitelist; reject `alg: none` |
+| 8  | RISK-16 — TLS Downgrade | **7.2** | HIGH | HTTPS/TLS 1.3; HSTS with long max-age |
+| 9  | RISK-08 — Weak Passwords | **7.0** | HIGH | BCrypt / Argon2 |
+| 10 | RISK-14 — Admin Exposure | **7.0** | HIGH | Network restriction; JWT Admin role required |
+| 11 | RISK-07 — Role Abuse | **6.6** | HIGH | RBAC matrix: DELETE OWNER-only |
+| 12 | RISK-19 — Excessive DB Privileges | **6.2** | HIGH | DML-only DB user; no DDL permissions |
+| 13 | RISK-15 — User Enumeration | **6.0** | HIGH | Generic error message for all login failures |
+| 14 | RISK-12 — Error Disclosure | **6.0** | HIGH | Global exception handler; no stack traces |
+| 15 | RISK-18 — Error Messages | **6.0** | HIGH | Global exception handler; sanitised responses |
+| 16 | RISK-10 — Log Tampering | **5.4** | HIGH | External ELK/SIEM; real-time forwarding |
+| 17 | RISK-17 — Repudiation | **5.0** | HIGH | Structured audit log forwarded to ELK/SIEM before response |
+| 18 | RISK-13 — Sensitive Logs | **4.8** | MEDIUM | Audit event schema excludes sensitive fields |
+| 19 | RISK-11 — File Integrity | **4.6** | MEDIUM | SHA-256 FileHash verified on every download |
 
 ---
 
@@ -675,8 +683,10 @@ The following table maps each high-priority risk to the specific architectural c
 | RISK-10 Log Tampering | T-13 | All audit events forwarded to external ELK/SIEM over HTTPS/TLS with API key before response is returned; logs not stored exclusively locally | FR-08, SDR-NEW-03          |
 | RISK-11 File Integrity | T-17 | SHA-256 FileHash stored in FileVersion at upload time; verified on every download in P2.2; abort and log `DOWNLOAD_INTEGRITY_FAIL` on mismatch | SDR-NEW-11                 |
 | RISK-13 Sensitive Logs | T-19 | Audit event schema: only timestamp, userId, action, resourceId, resourceType, sourceIP, outcome — no passwords, tokens, or file content | SDR-NEW-12                 |
-| T-02 TLS Downgrade | T-02 | HTTPS/TLS 1.3 enforced; HSTS with long max-age; HTTP connections rejected | SDR-09, NFR-01             |
-| T-03 Repudiation | T-03 | Structured audit log with userId, action, resourceId, timestamp, sourceIP forwarded before response | FR-08                      |
+| RISK-16 TLS Downgrade | T-02 | HTTPS/TLS 1.3 enforced; HSTS with long max-age; HTTP connections rejected | SDR-09, NFR-01 |
+| RISK-17 Repudiation | T-03 | Structured audit log with userId, action, resourceId, timestamp, sourceIP forwarded to ELK/SIEM before response | FR-08, SDR-NEW-03 |
+| RISK-18 Error Messages | T-12 | Global exception handler returns only generic messages; DB error details never forwarded to HTTP response; sanitised logging fields | SDR-09 |
+| RISK-19 Excessive DB Privileges | T-15 | Production DB user has DML-only permissions (SELECT, INSERT, UPDATE, DELETE) — no DDL, no TRUNCATE; limits blast radius of SQL injection | SDR-NEW-06 |
 
 ---
 
