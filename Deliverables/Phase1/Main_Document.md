@@ -462,7 +462,7 @@ Level 2 decomposes the **File Service sub-system** — the highest threat-densit
 |-----------|--------|-------------|--------------|---------------|
 | **T-11** | T | **SQL Injection** — Attacker injects SQL through user-controlled input (filename, search queries) to exfiltrate or modify data. | External attacker | `filename = "' OR '1'='1"` in upload; SQL payload in any API parameter reaching the DB. |
 | **T-12** | I | **Sensitive Data in Error Messages / Logs** — Internal DB errors, query details, or user data exposed through HTTP responses or log endpoints. | External attacker | Trigger DB error; observe response or leaked log endpoint. |
-| **T-15** | I | **Excessive DB User Privileges** — The DB account used by the application has DDL permissions; SQL injection could DROP TABLE or CREATE a backdoor user. | External attacker (via T-11) | Exploit SQL injection with `DROP TABLE` or `CREATE USER` statements if the DB user has DDL permissions. |
+| **T-15** | E | **Excessive DB User Privileges** — The DB account used by the application has DDL permissions; SQL injection could DROP TABLE or CREATE a backdoor user, granting the attacker capabilities far beyond what the application should allow. | External attacker (via T-11) | Exploit SQL injection with `DROP TABLE` or `CREATE USER` statements if the DB user has DDL permissions. |
 
 #### Data Flows: DF-12/DF-13 — Application ↔ Physical File System
 
@@ -483,7 +483,7 @@ Level 2 decomposes the **File Service sub-system** — the highest threat-densit
 | Threat ID | STRIDE | Description | Threat Agent | Attack Vector |
 |-----------|--------|-------------|--------------|---------------|
 | **T-14** | I | **Plaintext / Weak Password Storage** — Password hashes stored in a reversible or weak format (MD5, SHA-1), recoverable after a database breach. | Insider / DB breach | Direct read from the `users` table. |
-| **T-15** | I | **Excessive DB User Privileges** — The DB account used by the application has DDL permissions; SQL injection could DROP TABLE or CREATE backdoor. | External attacker (via T-11) | Exploit SQL injection with `DROP TABLE` or `CREATE USER`. |
+| **T-15** | E | **Excessive DB User Privileges** — The DB account used by the application has DDL permissions; SQL injection could DROP TABLE or CREATE a backdoor user, granting the attacker capabilities far beyond what the application should allow. | External attacker (via T-11) | Exploit SQL injection with `DROP TABLE` or `CREATE USER`. |
 
 #### Data Flow: DF-14 — Audit Logs
 
@@ -546,7 +546,7 @@ Level 2 decomposes the **File Service sub-system** — the highest threat-densit
 | T-12 | I | Sensitive Data in Error Messages | HIGH |
 | T-13 | R | Log Tampering / No Audit Trail | HIGH |
 | T-14 | I | Weak Password Storage | HIGH |
-| T-15 | I | Excessive DB Privileges | HIGH |
+| T-15 | E | Excessive DB Privileges | HIGH |
 | T-16 | I | User Enumeration via Login Error | HIGH |
 | T-17 | T | File Integrity Tampering on Disk | MEDIUM |
 | T-18 | D | Disk Exhaustion (DoS) | CRITICAL |

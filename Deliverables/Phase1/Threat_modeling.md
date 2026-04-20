@@ -123,7 +123,7 @@
 |-----------|--------|-------------|--------------|---------------|
 | **T-11** | T | **SQL Injection** — Attacker injects SQL through user-controlled input (filename, search queries, folderId) to exfiltrate or modify data. | External attacker | `filename = "' OR '1'='1"` in upload; SQL payload in any API parameter reaching the DB via string concatenation. |
 | **T-12** | I | **Sensitive Data in Error Messages / Logs** — Internal DB errors, query details, or user data exposed through HTTP responses or log endpoints. | External attacker | Trigger DB error (malformed input, constraint violations); observe response body or leaked log endpoint. |
-| **T-15** | I | **Excessive DB User Privileges** — The DB account used by the application has DDL permissions; SQL injection could DROP TABLE or CREATE a backdoor user. | External attacker (via T-11) | Exploit SQL injection with `DROP TABLE` or `CREATE USER` statements if the DB user has DDL permissions. |
+| **T-15** | E | **Excessive DB User Privileges** — The DB account used by the application has DDL permissions; SQL injection could DROP TABLE or CREATE a backdoor user, granting the attacker capabilities far beyond what the application should allow. | External attacker (via T-11) | Exploit SQL injection with `DROP TABLE` or `CREATE USER` statements if the DB user has DDL permissions. |
 
 ---
 
@@ -142,7 +142,7 @@
 |-----------|--------|-------------|--------------|---------------|
 | **T-11** | T | **SQL Injection** — User-supplied input interpolated into SQL queries allows manipulation of DB state. | External attacker | Craft SQL payloads in any input field that reaches a non-parameterised query. |
 | **T-14** | I | **Plaintext / Weak Password Storage** — Password hashes stored in a reversible or weak format (MD5, SHA-1) are recoverable after a database breach. | Insider / DB breach | Direct read from the `users` table following a SQL injection or DB compromise. |
-| **T-15** | I | **Excessive DB User Privileges** — DDL-enabled DB account allows destructive operations via SQL injection. | External attacker | Exploit SQL injection with DDL commands (DROP, CREATE, TRUNCATE). |
+| **T-15** | E | **Excessive DB User Privileges** — DDL-enabled DB account allows destructive operations via SQL injection. | External attacker | Exploit SQL injection with DDL commands (DROP, CREATE, TRUNCATE). |
 
 ---
 
@@ -220,7 +220,7 @@
 | **T-12** | I | DF-11, PostgreSQL | Sensitive Data in Error Messages | HIGH |
 | **T-13** | R | DF-14, P2.4 | Log Tampering / No Audit Trail | HIGH |
 | **T-14** | I | PostgreSQL | Weak Password Storage | HIGH |
-| **T-15** | I | DF-10, PostgreSQL | Excessive DB User Privileges | HIGH |
+| **T-15** | E | DF-10, PostgreSQL | Excessive DB User Privileges | HIGH |
 | **T-16** | I | DF-01, User Entity | User Enumeration via Login Error | HIGH |
 | **T-17** | T | DF-12, DF-13, Physical FS, P2.2 | File Integrity Tampering on Disk | MEDIUM |
 | **T-18** | D | Physical FS, DF-03 | Disk Exhaustion (DoS) | CRITICAL |
@@ -269,10 +269,10 @@
 | DF-06 File Delete | Data Flow | — | — | — | — | — | T-09 | T-09 |
 | DF-08 Folder Operations | Data Flow | — | T-05b | — | — | — | T-07 | T-05b, T-07 |
 | DF-09 Admin Operations | Data Flow | — | — | — | — | — | T-20 | T-20 |
-| DF-10/11 App ↔ PostgreSQL | Data Flow | — | T-11 | — | T-12, T-15 | — | — | T-11, T-12, T-15 |
+| DF-10/11 App ↔ PostgreSQL | Data Flow | — | T-11 | — | T-12 | — | T-15 | T-11, T-12, T-15 |
 | DF-12/13 App ↔ File System | Data Flow | — | T-17 | — | — | T-18 | — | T-17, T-18 |
 | DF-14 Audit Log Forward | Data Flow | — | — | T-13 | T-19 | — | — | T-13, T-19 |
-| PostgreSQL Database | Data Store | — | T-11 | — | T-14, T-15 | — | — | T-11, T-14, T-15 |
+| PostgreSQL Database | Data Store | — | T-11 | — | T-14 | — | T-15* | T-11, T-14, T-15 |
 | Physical File System | Data Store | — | T-17 | — | — | T-18 | — | T-17, T-18 |
 | P2.1 File Request Handler | Process (L2) | — | T-05, T-06 | — | — | T-08 | T-07, T-09 | T-05–T-09 |
 | P2.2 File Store | Process (L2) | — | T-05, T-17 | — | — | — | — | T-05, T-17 |
@@ -281,18 +281,7 @@
 
 ---
 
-## 6. Threat Modelling Review Process
-
-| Checkpoint | Trigger | Action |
-|------------|---------|--------|
-| Architecture change | Any change to DFD components or trust boundaries | Re-run STRIDE; update threat table and mitigations |
-| New feature added | New API endpoint or data flow introduced | Add element to DFD; apply STRIDE; add security test cases |
-| Phase 2 Sprint 1 start | Before implementation begins | Review all CRITICAL and HIGH threats; confirm mitigations are implemented |
-| Post-sprint | After each Phase 2 sprint | Verify mitigations implemented; update ASVS checklist; re-run DAST |
-
----
-
-## 7. References
+## 6. References
 
 | Document | Location |
 |----------|----------|
