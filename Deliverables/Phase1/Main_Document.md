@@ -26,7 +26,7 @@
 | 1 | Tiago Miguel Silva | 1250554    |
 | 2 | Pedro Conceição    | 1211018    |
 | 3 | Tiago Queirós      | 1210910    |
-| 4 | \<name\>           | \<id\>     |
+| 4 | Gonçalo Costa      | 1201062    |
 
 ---
 
