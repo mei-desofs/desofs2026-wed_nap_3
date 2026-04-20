@@ -636,18 +636,18 @@ Abuse cases describe how a malicious actor exploits the system's functionality. 
 
 | Priority | Risk ID | DREAD Score | Level | Key Mitigation |
 |----------|---------|-------------|-------|----------------|
-| 1 | RISK-03 — IDOR | **9.0** | CRITICAL | AccessShare object-level check per resourceId |
-| 2 | RISK-01 — Path Traversal | **8.8** | CRITICAL | UUID physical names; `Path.normalize()` + base-dir check |
-| 3 | RISK-04 — SQL Injection | **8.8** | CRITICAL | Prepared statements exclusively; DML-only DB user |
-| 4 | RISK-02 — Web Shell Upload | **8.2** | CRITICAL | Magic-byte MIME validation; out-of-webroot storage |
-| 5 | RISK-09 — DoS Upload | **7.8** | CRITICAL | Max file size; StorageQuota; rate limiting |
-| 6 | RISK-05 — Brute Force | **7.6** | HIGH | Rate limit; account lockout (IsLocked) |
-| 7 | RISK-06 — JWT Spoofing | **7.2** | HIGH | Algorithm whitelist; reject `alg: none` |
-| 8 | RISK-08 — Weak Passwords | **7.0** | HIGH | BCrypt / Argon2 |
-| 9 | RISK-14 — Admin Exposure | **7.0** | HIGH | Network restriction; JWT Admin role required |
-| 10 | RISK-15 — User Enumeration | **6.0** | HIGH | Generic error message for all login failures |
-| 11 | RISK-12 — Error Disclosure | **6.0** | HIGH | Global exception handler; no stack traces |
-| 12 | RISK-07 — Role Abuse | **6.6** | HIGH | RBAC matrix: DELETE OWNER-only |
+| 1        | RISK-03 — IDOR | **9.0** | CRITICAL | AccessShare object-level check per resourceId |
+| 2        | RISK-01 — Path Traversal | **8.8** | CRITICAL | UUID physical names; `Path.normalize()` + base-dir check |
+| 3        | RISK-04 — SQL Injection | **8.8** | CRITICAL | Prepared statements exclusively; DML-only DB user |
+| 4        | RISK-02 — Web Shell Upload | **8.2** | CRITICAL | Magic-byte MIME validation; out-of-webroot storage |
+| 5        | RISK-09 — DoS Upload | **7.8** | CRITICAL | Max file size; StorageQuota; rate limiting |
+| 6        | RISK-05 — Brute Force | **7.6** | HIGH | Rate limit; account lockout (IsLocked) |
+| 7        | RISK-06 — JWT Spoofing | **7.2** | HIGH | Algorithm whitelist; reject `alg: none` |
+| 8        | RISK-08 — Weak Passwords | **7.0** | HIGH | BCrypt / Argon2 |
+| 9        | RISK-14 — Admin Exposure | **7.0** | HIGH | Network restriction; JWT Admin role required |
+| 10       | RISK-07 — Role Abuse | **6.6** | HIGH | RBAC matrix: DELETE OWNER-only |
+| 11       | RISK-15 — User Enumeration | **6.0** | HIGH | Generic error message for all login failures |
+| 12       | RISK-12 — Error Disclosure | **6.0** | HIGH | Global exception handler; no stack traces |
 | 13 | RISK-10 — Log Tampering | **5.4** | HIGH | External ELK/SIEM; real-time forwarding |
 | 14 | RISK-13 — Sensitive Logs | **4.8** | MEDIUM | Audit event schema excludes sensitive fields |
 | 15 | RISK-11 — File Integrity | **4.6** | MEDIUM | SHA-256 FileHash verified on every download |
