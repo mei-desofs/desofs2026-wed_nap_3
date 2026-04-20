@@ -283,23 +283,23 @@ Each dimension is scored on a scale of **1–10**:
 
 ## 3. Prioritised Risk Register
 
-| Risk ID | Threat(s) | DREAD Score | Level | Priority | Status |
-|---------|-----------|-------------|-------|----------|--------|
-| RISK-03 | T-07 IDOR | **9.0** | CRITICAL | 1 | Mitigated — AccessShare per resourceId |
-| RISK-01 | T-05 Path Traversal | **8.8** | CRITICAL | 2 | Mitigated — UUID naming + path normalisation |
-| RISK-04 | T-11 SQL Injection | **8.8** | CRITICAL | 3 | Mitigated — prepared statements |
-| RISK-02 | T-06 Web Shell Upload | **8.2** | CRITICAL | 4 | Mitigated — magic-byte MIME check |
-| RISK-09 | T-08/T-18 DoS Upload | **7.8** | CRITICAL | 5 | Mitigated — size limit + StorageQuota |
-| RISK-05 | T-10 Brute Force | **7.6** | HIGH | 6 | Mitigated — rate limit + lockout |
-| RISK-06 | T-01 JWT Spoofing | **7.2** | HIGH | 7 | Mitigated — algorithm whitelist |
-| RISK-08 | T-14 Weak Passwords | **7.0** | HIGH | 8 | Mitigated — BCrypt/Argon2 |
-| RISK-14 | T-20 Admin Exposure | **7.0** | HIGH | 9 | Mitigated — network restriction + Admin role |
-| RISK-15 | T-16 User Enumeration | **6.0** | HIGH | 10 | Mitigated — generic error message |
-| RISK-12 | T-04 Error Disclosure | **6.0** | HIGH | 11 | Mitigated — global exception handler |
-| RISK-07 | T-09 Role Abuse | **6.6** | HIGH | 12 | Mitigated — RBAC matrix OWNER-only DELETE |
-| RISK-10 | T-13 Log Tampering | **5.4** | HIGH | 13 | Mitigated — external ELK/SIEM |
-| RISK-11 | T-17 File Integrity | **4.6** | MEDIUM | 14 | Mitigated — SHA-256 FileHash verification |
-| RISK-13 | T-19 Sensitive Logs | **4.8** | MEDIUM | 15 | Mitigated — audit event schema |
+| Priority | Risk ID | DREAD Score | Level | Key Mitigation |
+|----------|---------|-------------|-------|----------------|
+| 1        | RISK-03 — IDOR | **9.0** | CRITICAL | AccessShare object-level check per resourceId |
+| 2        | RISK-01 — Path Traversal | **8.8** | CRITICAL | UUID physical names; `Path.normalize()` + base-dir check |
+| 3        | RISK-04 — SQL Injection | **8.8** | CRITICAL | Prepared statements exclusively; DML-only DB user |
+| 4        | RISK-02 — Web Shell Upload | **8.2** | CRITICAL | Magic-byte MIME validation; out-of-webroot storage |
+| 5        | RISK-09 — DoS Upload | **7.8** | CRITICAL | Max file size; StorageQuota; rate limiting |
+| 6        | RISK-05 — Brute Force | **7.6** | HIGH | Rate limit; account lockout (IsLocked) |
+| 7        | RISK-06 — JWT Spoofing | **7.2** | HIGH | Algorithm whitelist; reject `alg: none` |
+| 8        | RISK-08 — Weak Passwords | **7.0** | HIGH | BCrypt / Argon2 |
+| 9        | RISK-14 — Admin Exposure | **7.0** | HIGH | Network restriction; JWT Admin role required |
+| 10       | RISK-07 — Role Abuse | **6.6** | HIGH | RBAC matrix: DELETE OWNER-only |
+| 11       | RISK-15 — User Enumeration | **6.0** | HIGH | Generic error message for all login failures |
+| 12       | RISK-12 — Error Disclosure | **6.0** | HIGH | Global exception handler; no stack traces |
+| 13 | RISK-10 — Log Tampering | **5.4** | HIGH | External ELK/SIEM; real-time forwarding |
+| 14 | RISK-13 — Sensitive Logs | **4.8** | MEDIUM | Audit event schema excludes sensitive fields |
+| 15 | RISK-11 — File Integrity | **4.6** | MEDIUM | SHA-256 FileHash verified on every download |
 
 ---
 
