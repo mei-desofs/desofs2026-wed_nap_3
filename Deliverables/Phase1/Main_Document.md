@@ -45,7 +45,6 @@ All Phase 1 documentation artefacts are located in the same directory as this do
 | Abuse Cases | [Abuses_Cases.md](./Abuses_Cases.md) |
 | Risk Assessment (DREAD) | [Risk_Assessment.md](./Risk_Assessment.md) |
 | Security Testing Plan | [Security_Testing.md](./Security_Testing.md) |
-| ASVS Checklist (Markdown) | [ASVS_Checklist.md](./ASVS_Checklist.md) |
 | ASVS Tracker (Excel) | [ASVS_5_0_Tracker_filled.xlsx](./ASVS_5_0_Tracker_filled.xlsx) |
 
 ---
@@ -63,6 +62,7 @@ All Phase 1 documentation artefacts are located in the same directory as this do
 9. [Mitigations](#9-mitigations)
 10. [Security Requirements](#10-security-requirements)
 11. [Security Testing Plan](#11-security-testing-plan)
+12. [ASVS Assessment](#12-asvs-assessment)
 13. [Phase 1 Summary](#12-phase-1-summary)
 
 ---
@@ -1045,22 +1045,10 @@ Security testing follows a **risk-based, threat-driven** approach aligned with O
 ---
 
 ## 12. ASVS Assessment
-
-> 📋 Checklist summary: [ASVS_Checklist.md](./ASVS_Checklist.md)  
+ 
 > 📊 Full tracker (Excel): [ASVS_5_0_Tracker_filled.xlsx](./ASVS_5_0_Tracker_filled.xlsx)
 
-The OWASP Application Security Verification Standard (ASVS) 5.0 Level 2 has been used as the primary security guideline for this project. The tracker covers all 17 chapters (345 requirements total). Phase 1 focuses on architecture-relevant chapters; implementation-dependent items are deferred to Phase 2 sprints.
-
-| Chapter | Scope for Phase 1 |
-|---------|-------------------|
-| V5 – File Handling | Core to system — fully assessed |
-| V8 – Authorization | Core to system — fully assessed |
-| V9 – Self-contained Tokens | Core to system — fully assessed |
-| V16 – Security Logging | Core to system — fully assessed |
-| V6 – Authentication | Architecture defined; implementation deferred to Phase 2 |
-| V12 – Secure Communication | TLS/HSTS controls defined; validated in Phase 2 |
-| V10 – OAuth and OIDC | Not Applicable — internal JWT used |
-| V17 – WebRTC | Not Applicable — not in scope |
+The OWASP Application Security Verification Standard (ASVS) 5.0 has been used as the primary security guideline for this project. The tracker covers all 17 chapters (345 requirements total). Phase 1 focuses on architecture-relevant chapters; implementation-dependent items are deferred to Phase 2 sprints.
 
 ---
 
