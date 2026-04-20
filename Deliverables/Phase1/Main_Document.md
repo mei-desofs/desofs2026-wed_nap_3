@@ -138,8 +138,6 @@ The diagram shows the physical deployment view: the REST client communicates wit
 
 ## 3. Domain Model (DDD)
 
-> 📄 Full detail: [Domain_model.mmd](./Domain_model.mmd)
-
 ### 3.1 Aggregates
 
 The domain model follows Domain-Driven Design (DDD) principles and is organised around **five aggregate roots**:
