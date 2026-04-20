@@ -658,25 +658,25 @@ Abuse cases describe how a malicious actor exploits the system's functionality. 
 
 The following table maps each high-priority risk to the specific architectural control that addresses it, along with the requirement ID for traceability:
 
-| Risk | Threat | Control | Requirement |
-|------|--------|---------|------------|
-| RISK-03 IDOR | T-07 | Object-level AccessShare check for every API operation — authentication alone is not sufficient | SDR-02 |
-| RISK-01 Path Traversal | T-05 | UUID as physical filename; `Path.normalize()` + base-directory validation before every file write/read; filename sanitisation in metadata | SDR-04 |
-| RISK-04 SQL Injection | T-11 | JDBC prepared statements and JPA named queries exclusively; no string concatenation in SQL; DML-only DB user | SDR-03, SDR-NEW-06 |
-| RISK-02 Web Shell Upload | T-06 | Magic-byte MIME validation using Apache Tika (ignores Content-Type header); MIME type whitelist; files stored outside web root; storage directory has no execute permissions; UUID filenames | SDR-03, SDR-05 |
+| Risk | Threat | Control | Requirement                |
+|------|--------|---------|----------------------------|
+| RISK-03 IDOR | T-07 | Object-level AccessShare check for every API operation — authentication alone is not sufficient | SDR-02                     |
+| RISK-01 Path Traversal | T-05 | UUID as physical filename; `Path.normalize()` + base-directory validation before every file write/read; filename sanitisation in metadata | SDR-04                     |
+| RISK-04 SQL Injection | T-11 | JDBC prepared statements and JPA named queries exclusively; no string concatenation in SQL; DML-only DB user | SDR-03, SDR-NEW-06         |
+| RISK-02 Web Shell Upload | T-06 | Magic-byte MIME validation using Apache Tika (ignores Content-Type header); MIME type whitelist; files stored outside web root; storage directory has no execute permissions; UUID filenames | SDR-03, SDR-05             |
 | RISK-09 DoS Upload | T-08, T-18 | Max file size enforced before buffering (`spring.servlet.multipart.max-file-size`); per-user StorageQuota checked before write; rate limiting on upload endpoint (HTTP 429) | SDR-05, SDR-NEW-07, SDR-10 |
-| RISK-05 Brute Force | T-10 | Rate limiting on `/auth/login`; account lockout (`IsLocked=true`) after N failures; identical generic error message for all failures | SDR-10, SDR-01 |
-| RISK-06 JWT Spoofing | T-01 | Server-side algorithm whitelist (RS256/HS256 only); explicit rejection of `alg: none`; validation of `iss`, `exp`, `sub`, `aud` claims | SDR-01, SDR-NEW-01 |
-| RISK-08 Weak Passwords | T-14 | BCrypt or Argon2 with appropriate work factor; salt per password; never store plaintext | SDR-06 |
-| RISK-14 Admin Exposure | T-20 | Spring Boot Actuator restricted to internal network via firewall rule; admin endpoints require JWT with explicit Admin role | SDR-02, SDR-09 |
-| RISK-15 User Enumeration | T-16 | Identical error message `"Invalid credentials"` for both "user not found" and "wrong password" cases | SDR-01 |
-| RISK-12 Error Disclosure | T-04 | Global exception handler returns only generic messages; stack traces never exposed in production responses | SDR-09 |
-| RISK-07 Role Abuse | T-09 | RBAC matrix enforced: DELETE is OWNER-only; EDITOR/VIEWER receive HTTP 403; soft delete limits damage | SDR-02 |
-| RISK-10 Log Tampering | T-13 | All audit events forwarded to external ELK/SIEM over HTTPS/TLS with API key before response is returned; logs not stored exclusively locally | FR-08, SDR-NEW-03 |
-| RISK-11 File Integrity | T-17 | SHA-256 FileHash stored in FileVersion at upload time; verified on every download in P2.2; abort and log `DOWNLOAD_INTEGRITY_FAIL` on mismatch | SDR-NEW-11 |
-| RISK-13 Sensitive Logs | T-19 | Audit event schema: only timestamp, userId, action, resourceId, resourceType, sourceIP, outcome — no passwords, tokens, or file content | SDR-NEW-12 |
-| T-02 TLS Downgrade | T-02 | HTTPS/TLS 1.3 enforced; HSTS with long max-age; HTTP connections rejected | SDR-09, NFR-01 |
-| T-03 Repudiation | T-03 | Structured audit log with userId, action, resourceId, timestamp, sourceIP forwarded before response | FR-08 |
+| RISK-05 Brute Force | T-10 | Rate limiting on `/auth/login`; account lockout (`IsLocked=true`) after N failures; identical generic error message for all failures | SDR-10, SDR-09             |
+| RISK-06 JWT Spoofing | T-01 | Server-side algorithm whitelist (RS256/HS256 only); explicit rejection of `alg: none`; validation of `iss`, `exp`, `sub`, `aud` claims | SDR-01, SDR-NEW-01         |
+| RISK-08 Weak Passwords | T-14 | BCrypt or Argon2 with appropriate work factor; salt per password; never store plaintext | SDR-06                     |
+| RISK-14 Admin Exposure | T-20 | Spring Boot Actuator restricted to internal network via firewall rule; admin endpoints require JWT with explicit Admin role | SDR-02, SDR-09             |
+| RISK-15 User Enumeration | T-16 | Identical error message `"Invalid credentials"` for both "user not found" and "wrong password" cases | SDR-09                     |
+| RISK-12 Error Disclosure | T-04 | Global exception handler returns only generic messages; stack traces never exposed in production responses | SDR-09                     |
+| RISK-07 Role Abuse | T-09 | RBAC matrix enforced: DELETE is OWNER-only; EDITOR/VIEWER receive HTTP 403; soft delete limits damage | SDR-02                     |
+| RISK-10 Log Tampering | T-13 | All audit events forwarded to external ELK/SIEM over HTTPS/TLS with API key before response is returned; logs not stored exclusively locally | FR-08, SDR-NEW-03          |
+| RISK-11 File Integrity | T-17 | SHA-256 FileHash stored in FileVersion at upload time; verified on every download in P2.2; abort and log `DOWNLOAD_INTEGRITY_FAIL` on mismatch | SDR-NEW-11                 |
+| RISK-13 Sensitive Logs | T-19 | Audit event schema: only timestamp, userId, action, resourceId, resourceType, sourceIP, outcome — no passwords, tokens, or file content | SDR-NEW-12                 |
+| T-02 TLS Downgrade | T-02 | HTTPS/TLS 1.3 enforced; HSTS with long max-age; HTTP connections rejected | SDR-09, NFR-01             |
+| T-03 Repudiation | T-03 | Structured audit log with userId, action, resourceId, timestamp, sourceIP forwarded before response | FR-08                      |
 
 ---
 
@@ -701,7 +701,7 @@ This section consolidates all security requirements (from Section 4.3) with thei
 | **SDR-NEW-06** | DML-only DB user (no DDL, no TRUNCATE) | Limits blast radius of SQL injection — attacker cannot DROP tables or CREATE users | T-11, T-15 |
 | **SDR-NEW-07** | Per-user StorageQuota enforced at upload | Prevents a single user from exhausting disk space | T-18 |
 | **SDR-NEW-11** | SHA-256 FileHash verified on every download | Detects and prevents delivery of tampered file content | T-17 |
-
+| **SDR-NEW-12** | Audit event schema excludes sensitive fields (passwords, tokens, file content) | Prevents sensitive data exposure in logs | T-19 |
 ---
 
 ## 11. Security Testing Plan
