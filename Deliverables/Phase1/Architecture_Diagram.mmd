@@ -23,10 +23,15 @@ flowchart TD
         Disk[("«component»<br/>Physical File System")]
     end
 
+    subgraph AuthZone ["«execution environment»"]
+        Idp[("«component»<br/>Identity Provider")]
+    end
+
     ClientZone-- "HTTPS" --> AppZone
     AppZone -- "JDBC" --> DBZone
     AppZone -- "Java NIO (OS I/O)" --> OSZone
     AppZone -- "Logs/metrics" --> ELKZone
+    AppZone -- "Authentication" --> AuthZone
 
     NoteAPI["Handles logic, authorization<br/>and executes OS-level actions."]
     NoteDB["Stores metadata,<br/>UUIDs and User Roles."]
@@ -37,5 +42,5 @@ flowchart TD
     Disk -.- NoteDisk
 
     class Client,API comp
-    class DB,Disk,ELK store
+    class DB,Disk,ELK,Idp store
     class NoteAPI,NoteDB,NoteDisk note
