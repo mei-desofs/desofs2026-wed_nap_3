@@ -29,7 +29,7 @@ public class SecurityConfig {
             )
 
             // Configurar a validação de JWTs (OAuth2 Resource Server).
-            .oauth2ResourceServer(oauth2 -> oauth2.jwt()); // Configuração padrão que usa as propriedades do application.properties
+            .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {})); 
 
         return http.build();
     }

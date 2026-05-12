@@ -12,7 +12,9 @@ public class FileController {
 
     private final FileStorageService fileStorageService;
 
-    // ... (construtor)
+    public FileController(FileStorageService fileStorageService) {
+        this.fileStorageService = fileStorageService;
+    }
 
     @PostMapping("/upload")
     @PreAuthorize("hasAuthority('ROLE_OWNER') or hasAuthority('ROLE_EDITOR')")
@@ -30,4 +32,4 @@ public class FileController {
         // uma AccessDeniedException, que será apanhada pelo nosso GlobalSecurityExceptionHandler.
         return ResponseEntity.ok("Admin report data.");
     }
-}
+}   

@@ -1,0 +1,33 @@
+{
+  "groups": [
+    {
+      "name": "enderchest",
+      "type": "pt.isep.desofs.enderchest.config.ApplicationProperties",
+      "sourceType": "pt.isep.desofs.enderchest.config.ApplicationProperties"
+    },
+    {
+      "name": "enderchest.storage",
+      "type": "pt.isep.desofs.enderchest.config.ApplicationProperties$Storage",
+      "sourceType": "pt.isep.desofs.enderchest.config.ApplicationProperties",
+      "sourceMethod": "public pt.isep.desofs.enderchest.config.ApplicationProperties.Storage storage() "
+    }
+  ],
+  "properties": [
+    {
+      "name": "enderchest.storage.allowed-mime-types",
+      "type": "java.util.Set<java.lang.String>",
+      "sourceType": "pt.isep.desofs.enderchest.config.ApplicationProperties$Storage"
+    },
+    {
+      "name": "enderchest.storage.base-path",
+      "type": "java.lang.String",
+      "sourceType": "pt.isep.desofs.enderchest.config.ApplicationProperties$Storage"
+    },
+    {
+      "name": "enderchest.storage.max-file-size",
+      "type": "java.lang.String",
+      "sourceType": "pt.isep.desofs.enderchest.config.ApplicationProperties$Storage"
+    }
+  ],
+  "hints": []
+}

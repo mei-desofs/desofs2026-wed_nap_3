@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Ender Chest - Dashboard</title>
+</head>
+<body>
+    <h1>Welcome to your Ender Chest!</h1>
+
+    <!-- Formulário de Upload Seguro -->
+    <!-- O Thymeleaf adiciona automaticamente o input hidden com o token CSRF -->
+    <form method="POST" enctype="multipart/form-data" action="/api/files/upload">
+        <h2>Upload File</h2>
+        <input type="file" name="file" />
+        <button type="submit">Upload</button>
+    </form>
+
+    <!-- Botão de Logout -->
+    <form th:action="@{/logout}" method="post">
+        <button type="submit">Logout</button>
+    </form>
+</body>
+</html>
