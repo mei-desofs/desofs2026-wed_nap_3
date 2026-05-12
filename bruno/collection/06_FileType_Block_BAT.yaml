@@ -1,0 +1,31 @@
+meta:
+  name: File Type Blocking - BAT
+  type: http
+  seq: 6
+
+http:
+  method: POST
+  url: "{{base_url}}/api/files/upload"
+  
+  headers:
+    Authorization: "Bearer {{bearer_token}}"
+    Content-Type: multipart/form-data
+
+  body:
+    multipartForm:
+      - name: file
+        type: file
+        value: script.bat
+
+tests: |
+  test("Upload BAT - Should Return 400", function() {
+    expect(res.code).to.equal(400);
+  });
+  
+  test("Response indicates invalid file type", function() {
+    expect(res.body).to.include("InvalidFileTypeException");
+  });
+  
+  test("Executable script blocked", function() {
+    expect(res.body).to.include("not allowed");
+  });

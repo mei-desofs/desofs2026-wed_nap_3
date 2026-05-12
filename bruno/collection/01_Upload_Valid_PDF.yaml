@@ -1,0 +1,31 @@
+meta:
+  name: Upload Valid PDF
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{base_url}}/api/files/upload"
+  
+  headers:
+    Authorization: "Bearer {{bearer_token}}"
+    Content-Type: multipart/form-data
+
+  body:
+    multipartForm:
+      - name: file
+        type: file
+        value: test_valid.pdf
+        
+tests: |
+  test("Upload Valid PDF - Should Return 200", function() {
+    expect(res.code).to.equal(200);
+  });
+  
+  test("Response contains file hash", function() {
+    expect(res.body).to.include("hash");
+  });
+  
+  test("Response contains file ID", function() {
+    expect(res.body).to.include("id");
+  });
