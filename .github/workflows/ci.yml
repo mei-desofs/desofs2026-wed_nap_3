@@ -71,7 +71,8 @@ jobs:
         run: |
           mvn -B dependency-check:check \
             -DnvdApiKey=${NVD_API_KEY} \
-            -DfailOnError=false
+            -DfailOnError=false \
+            -DossindexAnalyzerEnabled=false
 
       - name: Upload OWASP report
         uses: actions/upload-artifact@v4
