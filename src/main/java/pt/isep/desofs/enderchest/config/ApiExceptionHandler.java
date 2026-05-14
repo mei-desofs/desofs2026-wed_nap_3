@@ -106,7 +106,7 @@ public class ApiExceptionHandler {
 
         log.warn("Folder not found: {}", ex.getMessage());
 
-        return ResponseEntity.notFound().build();
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
     }
 
     /**
