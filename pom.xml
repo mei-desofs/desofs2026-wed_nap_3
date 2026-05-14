@@ -18,10 +18,9 @@
         <java.version>21</java.version>
         <lombok.version>1.18.36</lombok.version>
         <!-- CVE overrides: pin transitive deps to patched versions (SDR-07) -->
-        <tomcat.version>10.1.40</tomcat.version>
-        <log4j2.version>2.24.3</log4j2.version>
-        <nimbus-jose-jwt.version>9.40.0</nimbus-jose-jwt.version>
-        <postgresql.version>42.7.5</postgresql.version>
+        <tomcat.version>10.1.45</tomcat.version>
+        <log4j2.version>2.25.4</log4j2.version>
+        <postgresql.version>42.7.11</postgresql.version>
     </properties>
 
     <dependencies>
@@ -62,7 +61,7 @@
         <dependency>
             <groupId>org.apache.tika</groupId>
             <artifactId>tika-core</artifactId>
-            <version>3.2.0</version>
+            <version>3.2.2</version>
         </dependency>
 
         <!-- Configuração Segura: Para ler ficheiros .properties de forma segura -->
