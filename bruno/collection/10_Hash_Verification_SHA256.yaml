@@ -1,0 +1,30 @@
+meta:
+  name: Hash Verification - SHA-256
+  type: http
+  seq: 10
+
+http:
+  method: GET
+  url: "{{base_url}}/api/files/verify-hash"
+  
+  headers:
+    Authorization: "Bearer {{bearer_token}}"
+
+  query:
+    - name: hash
+      value: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+
+tests: |
+  test("Hash verification - Should Return 200", function() {
+    expect(res.code).to.equal(200);
+  });
+  
+  test("Hash format valid (SHA-256)", function() {
+    let hash = res.body.hash;
+    expect(hash).to.have.length(64);
+    expect(hash).to.match(/^[a-f0-9]{64}$/i);
+  });
+  
+  test("Response contains file metadata", function() {
+    expect(res.body).to.include("uploadedAt") || expect(res.body).to.include("fileName");
+  });

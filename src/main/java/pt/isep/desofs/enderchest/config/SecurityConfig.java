@@ -24,6 +24,13 @@ public class SecurityConfig {
 
             // Configurar as regras de autorização para todos os endpoints.
             .authorizeHttpRequests(authz -> authz
+                // Permitir acesso público a Swagger/OpenAPI
+                .requestMatchers(
+                    "/swagger-ui/**",
+                    "/swagger-ui.html",
+                    "/v3/api-docs/**",
+                    "/webjars/**"
+                ).permitAll()
                 // Por defeito, todas as requests exigem um utilizador autenticado.
                 .anyRequest().authenticated()
             )

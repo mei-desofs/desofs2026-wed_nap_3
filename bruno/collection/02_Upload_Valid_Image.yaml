@@ -1,0 +1,31 @@
+meta:
+  name: Upload Valid Image
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{base_url}}/api/files/upload"
+  
+  headers:
+    Authorization: "Bearer {{bearer_token}}"
+    Content-Type: multipart/form-data
+
+  body:
+    multipartForm:
+      - name: file
+        type: file
+        value: test_valid.jpg
+
+tests: |
+  test("Upload Valid JPEG - Should Return 200", function() {
+    expect(res.code).to.equal(200);
+  });
+  
+  test("Response contains file hash", function() {
+    expect(res.body).to.include("hash");
+  });
+  
+  test("Response contains MIME type", function() {
+    expect(res.body).to.include("mimeType");
+  });

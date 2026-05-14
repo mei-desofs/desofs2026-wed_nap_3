@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "enderchest.fullname" . }}
+  labels:
+    {{- include "enderchest.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "enderchest.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "enderchest.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+      - name: {{ .Chart.Name }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        env:
+        {{- range $key, $value := .Values.env }}
+        - name: {{ $key }}
+          value: "{{ $value }}"
+        {{- end }}
+        livenessProbe:
+          httpGet:
+            path: /v3/api-docs
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /v3/api-docs
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        resources:
+          {{- toYaml .Values.resources | nindent 12 }}
+        volumeMounts:
+        - name: file-storage
+          mountPath: {{ .Values.persistence.mountPath }}
+      volumes:
+      - name: file-storage
+        {{- if .Values.persistence.enabled }}
+        persistentVolumeClaim:
+          claimName: {{ include "enderchest.fullname" . }}-pvc
+        {{- else }}
+        emptyDir: {}
+        {{- end }}
