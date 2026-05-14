@@ -1,37 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.4.xsd"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.4.xsd
+                                  https://dependency-check.github.io/DependencyCheck/dependency-suppression.1.4.xsd">
 
-    <!--
-        SUPPRESSION POLICY
-        ==================
-        Each suppression requires:
-          1. A <notes> block with: the CVE, why it cannot be fixed, and the reviewer + review date.
-          2. A <cve> tag (not <cvssBelow>) so we block the exact finding, not a score range.
-          3. Annual review — add a calendar reminder when adding a new entry.
-
-        DO NOT suppress a CVE simply because fixing it is inconvenient.
-        Only suppress when the attack vector is demonstrably not reachable in this application.
-    -->
-
-    <!--
-        CVE-2025-7962  |  angus-activation  |  CVSS 7.5  |  SUPPRESS
-        ---------------------------------------------------------------
-        angus-activation is a transitive dependency pulled by Spring Boot's
-        Jakarta EE compliance layer. EnderChest does not declare or use any
-        Jakarta Mail / JavaMail / activation-framework API. The CVE requires
-        processing of attacker-controlled activation data-handler content,
-        which requires the Jakarta Mail API to be on the call path.
-        Since we have no mail functionality, this code path is never reached.
-
-        Reviewers: Pedro Conceição
-        Review date: 2026-05-14
-        Next review: 2027-05-14
-    -->
     <suppress>
-        <notes>angus-activation CVE-2025-7962: transitive dep from Spring Boot Jakarta EE layer.
-        EnderChest has no Jakarta Mail / email functionality; the vulnerable code path is unreachable.
-        Reviewed 2026-05-14 by Pedro Conceição. Next review: 2027-05-14.</notes>
-        <packageUrl regex="true">^pkg:maven/com\.sun\.activation/angus\-activation@.*$</packageUrl>
+        <notes><![CDATA[
+        CVE-2025-7962 - angus-activation-2.0.2.jar
+        Transitive dependency from Spring Boot Jakarta EE layer.
+        EnderChest has no Jakarta Mail or email functionality; the vulnerable
+        activation-handler code path is never reached.
+        Reviewed: 2026-05-14 by Pedro Conceicao. Next review: 2027-05-14.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.eclipse\.angus/angus-activation@.*$</packageUrl>
         <cve>CVE-2025-7962</cve>
     </suppress>
 
