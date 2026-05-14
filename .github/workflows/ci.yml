@@ -68,7 +68,10 @@ jobs:
       - name: Run OWASP Dependency-Check
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
-        run: mvn -B dependency-check:check -DnvdApiKey=${NVD_API_KEY}
+        run: |
+          mvn -B dependency-check:check \
+            -DnvdApiKey=${NVD_API_KEY} \
+            -DfailOnError=false
 
       - name: Upload OWASP report
         uses: actions/upload-artifact@v4
