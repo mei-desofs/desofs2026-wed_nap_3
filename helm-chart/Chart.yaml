@@ -1,0 +1,11 @@
+apiVersion: v2
+name: enderchest
+description: EnderChest - Secure collaborative file storage system
+type: application
+version: 1.0.0
+appVersion: "1.0"
+keywords:
+  - file-storage
+  - security
+  - collaboration
+home: https://github.com/your-org/enderchest

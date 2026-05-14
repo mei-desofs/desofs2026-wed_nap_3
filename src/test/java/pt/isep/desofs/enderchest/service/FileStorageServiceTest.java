@@ -20,6 +20,7 @@ import pt.isep.desofs.enderchest.exception.security.InvalidFileTypeException;
 import pt.isep.desofs.enderchest.exception.security.PathTraversalAttemptException;
 import pt.isep.desofs.enderchest.repository.FileRepository;
 import pt.isep.desofs.enderchest.repository.FileVersionRepository;
+import pt.isep.desofs.enderchest.repository.FolderRepository;
 import pt.isep.desofs.enderchest.service.dto.FileResponse;
 import pt.isep.desofs.enderchest.service.dto.UploadResponse;
 
@@ -70,7 +71,9 @@ class FileStorageServiceTest {
     @Mock
     private FileVersionRepository fileVersionRepository;
 
-    @InjectMocks
+    @Mock
+    private FolderRepository folderRepository;
+
     private FileStorageService fileStorageService;
 
     @Captor
@@ -87,20 +90,21 @@ class FileStorageServiceTest {
         // Create temporary storage directory
         testStoragePath = Files.createTempDirectory("file-storage-test-");
         
-        // Configure mocks
-        when(applicationProperties.storage()).thenReturn(storageConfig);
-        when(storageConfig.basePath()).thenReturn(testStoragePath.toString());
-        when(storageConfig.allowedMimeTypes()).thenReturn(Set.of(
+        // Configure mocks (lenient for tests that don't use all stubs)
+        lenient().when(applicationProperties.storage()).thenReturn(storageConfig);
+        lenient().when(storageConfig.basePath()).thenReturn(testStoragePath.toString());
+        lenient().when(storageConfig.allowedMimeTypes()).thenReturn(Set.of(
             "application/pdf",
             "image/jpeg",
             "image/png",
             "text/plain",
             "application/json"
         ));
-        when(storageConfig.maxFileSizeInBytes()).thenReturn(10_485_760L); // 10 MB
+        lenient().when(storageConfig.maxFileSizeInBytes()).thenReturn(10_485_760L); // 10 MB
+        lenient().when(storageConfig.storageQuotaInBytes()).thenReturn(1_073_741_824L); // 1 GB storage quota for tests
 
         // Recreate service with test path
-        fileStorageService = new FileStorageService(applicationProperties, fileRepository, fileVersionRepository);
+        fileStorageService = new FileStorageService(applicationProperties, fileRepository, fileVersionRepository, folderRepository);
         fileStorageService.init();
     }
 
@@ -205,7 +209,8 @@ class FileStorageServiceTest {
         // Arrange
         long maxSize = 100L; // 100 bytes
         when(storageConfig.maxFileSizeInBytes()).thenReturn(maxSize);
-        fileStorageService = new FileStorageService(applicationProperties, fileRepository, fileVersionRepository);
+        fileStorageService = new FileStorageService(applicationProperties, fileRepository, fileVersionRepository, folderRepository);
+        fileStorageService.init();
 
         MockMultipartFile uploadFile = new MockMultipartFile(
             "file",
@@ -226,8 +231,8 @@ class FileStorageServiceTest {
     void testNullFilenameRejection() {
         // Arrange
         MultipartFile uploadFile = mock(MultipartFile.class);
-        when(uploadFile.getOriginalFilename()).thenReturn(null);
-        when(uploadFile.getSize()).thenReturn(100L);
+        lenient().when(uploadFile.getOriginalFilename()).thenReturn(null);
+        lenient().when(uploadFile.getSize()).thenReturn(100L);
 
         // Act & Assert
         assertThrows(FileUploadException.class,

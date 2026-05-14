@@ -35,7 +35,9 @@ import java.util.UUID;
         @Index(name = "idx_files_uploaded_by_not_deleted", columnList = "uploaded_by, is_deleted"),
         @Index(name = "idx_files_uploaded_at", columnList = "uploaded_at"),
         @Index(name = "idx_files_is_deleted", columnList = "is_deleted"),
-        @Index(name = "idx_files_created_at", columnList = "created_at")
+        @Index(name = "idx_files_created_at", columnList = "created_at"),
+        @Index(name = "idx_files_folder_id_not_deleted", columnList = "folder_id, is_deleted"),
+        @Index(name = "idx_files_folder_id", columnList = "folder_id")
     }
 )
 @Getter
@@ -148,6 +150,26 @@ public class File {
     private LocalDateTime createdAt;
 
     /**
+     * Foreign key ID of the parent folder (nullable for root-level files).
+     * Used for querying files by folder. Managed by the folder relationship mapping.
+     * Set insertable=false, updatable=false to avoid duplication with @ManyToOne mapping.
+     */
+    @Column(name = "folder_id", insertable = false, updatable = false, columnDefinition = "UUID")
+    private UUID folderId;
+
+    /**
+     * Many-to-one relationship to Folder (nullable for root-level files).
+     * Defines the parent folder containing this file.
+     * Lazy-loaded to improve query performance.
+     * Optional relationship - null indicates root-level file.
+     * 
+     * The folder_id column is managed by this relationship mapping.
+     */
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "folder_id", referencedColumnName = "folder_id", nullable = true, updatable = true, foreignKey = @ForeignKey(name = "fk_files_folder_id"))
+    private Folder folder;
+
+    /**
      * Constructor with essential file metadata.
      * Useful for creating File instances with required fields only.
      * 
@@ -169,6 +191,7 @@ public class File {
         this.uploadedBy = uploadedBy;
         this.storageLocation = storageLocation;
         this.isDeleted = Boolean.FALSE;
+        this.folder = null;
     }
 
     /**
@@ -199,13 +222,27 @@ public class File {
     /**
      * Mark this file as deleted (soft delete).
      * Sets isDeleted flag and records deletion timestamp for audit trail.
+     * Enables file recovery and maintains audit compliance.
      * 
      * @return This File instance for method chaining
      */
-    public File delete() {
+    public File softDelete() {
         this.isDeleted = Boolean.TRUE;
         this.deletedAt = LocalDateTime.now();
         return this;
+    }
+
+    /**
+     * Mark this file as deleted (soft delete).
+     * Sets isDeleted flag and records deletion timestamp for audit trail.
+     * 
+     * Deprecated: Use softDelete() for clarity. This method maintained for backward compatibility.
+     * 
+     * @return This File instance for method chaining
+     */
+    @Deprecated(since = "1.0", forRemoval = false)
+    public File delete() {
+        return this.softDelete();
     }
 
     /**

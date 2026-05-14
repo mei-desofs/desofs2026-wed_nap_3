@@ -43,6 +43,17 @@ public interface FileVersionRepository extends JpaRepository<FileVersion, UUID> 
     List<FileVersion> findByFileIdOrderByVersionNumberDesc(UUID fileId);
 
     /**
+     * Find all versions of a specific file ordered by version number (oldest first).
+     * 
+     * Used for chronological audit trails and version history in ascending order.
+     * Query execution time: O(log n + k) where k is number of versions for the file.
+     * 
+     * @param fileId The ID of the file to get versions for
+     * @return List of versions ordered from oldest to newest
+     */
+    List<FileVersion> findByFileIdOrderByVersionNumberAsc(UUID fileId);
+
+    /**
      * Find a specific version of a file by version number.
      * 
      * Used for rollback scenarios and viewing specific historical versions.
@@ -232,4 +243,15 @@ public interface FileVersionRepository extends JpaRepository<FileVersion, UUID> 
         @Param("since") LocalDateTime since,
         @Param("limit") int limit
     );
+
+    /**
+     * Calculate total storage usage for a specific user.
+     *
+     * Sums all file sizes from FileVersion records where the file was uploaded by the user.
+     * Used for storage quota tracking and user profile information.
+     * Query execution time: O(log n + k) where k is user's files.
+     *
+     * @param uploadedBy User ID (JWT subject / username)
+     * @return Total size in bytes of all files uploaded by the user, or null if no files
+     */
 }

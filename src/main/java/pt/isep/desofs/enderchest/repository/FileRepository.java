@@ -170,4 +170,68 @@ public interface FileRepository extends JpaRepository<File, UUID> {
         ORDER BY f.uploadedAt ASC
     """)
     List<File> findOldFiles(@Param("beforeTime") LocalDateTime beforeTime);
+
+    /**
+     * Find all active files in a specific folder for a user.
+     * 
+     * Used for folder-based file listing and access control verification.
+     * Query leverages composite index (folder_id, is_deleted) for performance.
+     * Execution time: O(log n + k) where k is number of files in folder.
+     * 
+     * @param folderId The folder UUID to search within
+     * @return List of active files in the specified folder (empty if no files)
+     */
+    List<File> findByFolderIdAndIsDeletedFalse(UUID folderId);
+
+    /**
+     * Find all active files uploaded by a specific user using UUID ownerId.
+     * 
+     * Alternative method using UUID ownerId for consistency with newer API.
+     * Used for user file listing and quota calculations.
+     * Query leverages composite index (uploaded_by, is_deleted) for performance.
+     * 
+     * @param ownerId User ID (UUID) to search for
+     * @return List of active files for the user (empty if no files)
+     */
+    @Query("""
+        SELECT f FROM File f 
+        WHERE f.uploadedBy = CAST(:ownerId AS string)
+        AND f.isDeleted = false 
+        ORDER BY f.uploadedAt DESC
+    """)
+    List<File> findByOwnerIdAndIsDeletedFalse(@Param("ownerId") UUID ownerId);
+
+    /**
+     * Calculate total storage usage for a specific user.
+     * 
+     * Sums the size of all active files for a user.
+     * Used for quota enforcement and storage statistics.
+     * JPQL query performs aggregation at database level for efficiency.
+     * Query execution time: O(n) where n is number of user's files.
+     * 
+     * @param ownerId User ID (UUID) to calculate storage for
+     * @return Total storage usage in bytes (0 if user has no files)
+     */
+    @Query("""
+        SELECT COALESCE(SUM(f.fileSize), 0L) FROM File f 
+        WHERE f.uploadedBy = CAST(:ownerId AS string)
+        AND f.isDeleted = false
+    """)
+    Long calculateUserStorageUsage(@Param("ownerId") UUID ownerId);
+
+    /**
+     * Calculate total storage usage for a user using String ownerId.
+     * 
+     * Sums the size of all active files for a user.
+     * Used for quota enforcement and storage statistics.
+     * 
+     * @param ownerId User ID (String) to calculate storage for
+     * @return Total storage usage in bytes (0 if user has no files)
+     */
+    @Query("""
+        SELECT COALESCE(SUM(f.fileSize), 0L) FROM File f 
+        WHERE f.uploadedBy = :ownerId
+        AND f.isDeleted = false
+    """)
+    Long calculateUserStorageUsageByString(@Param("ownerId") String ownerId);
 }
