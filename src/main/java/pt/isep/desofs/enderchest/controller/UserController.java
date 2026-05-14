@@ -121,13 +121,13 @@ public class UserController {
             User user = userOptional.get();
 
             // Calculate storage usage (sum of all files for this user)
-            Long usedStorage = fileRepository.findAll().stream()
+            long usedStorage = fileRepository.findAll().stream()
                     .filter(f -> f.getUploadedBy().equals(user.getUsername()) && !f.getIsDeleted())
                     .mapToLong(f -> 0L)  // Size will come from FileVersion, placeholder for now
                     .sum();
 
             // Calculate available storage
-            Long availableStorage = DEFAULT_STORAGE_QUOTA - usedStorage;
+            long availableStorage = DEFAULT_STORAGE_QUOTA - usedStorage;
 
             log.info("User profile retrieved. UserId: {}, UsedStorage: {} bytes, AvailableStorage: {} bytes",
                     userId, usedStorage, availableStorage);
