@@ -285,7 +285,12 @@ public class ApiExceptionHandler {
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ResponseEntity<Map<String, Object>> handleGenericException(
-            Exception ex) {
+            Exception ex) throws Exception {
+
+        // Re-lançar AccessDeniedException para o Spring Security tratar com 403
+        if (ex instanceof org.springframework.security.access.AccessDeniedException) {
+            throw ex;
+        }
 
         Map<String, Object> error = new HashMap<>();
         error.put("timestamp", LocalDateTime.now());
