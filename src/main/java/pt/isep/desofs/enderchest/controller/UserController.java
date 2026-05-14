@@ -98,6 +98,7 @@ public class UserController {
         @ApiResponse(responseCode = "400", description = "Invalid user ID format"),
         @ApiResponse(responseCode = "401", description = "Unauthorized - missing or invalid bearer token")
     })
+    @SuppressWarnings("null")
     public ResponseEntity<UserProfileResponse> getCurrentUserProfile(
             @RequestHeader(value = "X-User-Id", required = true) 
             @Parameter(description = "User ID (from authentication header)", required = true)
@@ -176,6 +177,7 @@ public class UserController {
         @ApiResponse(responseCode = "200", description = "User exists"),
         @ApiResponse(responseCode = "404", description = "User not found")
     })
+    @SuppressWarnings("null")
     public ResponseEntity<Void> checkUserExists(
             @PathVariable 
             @Parameter(description = "User ID to check", required = true)

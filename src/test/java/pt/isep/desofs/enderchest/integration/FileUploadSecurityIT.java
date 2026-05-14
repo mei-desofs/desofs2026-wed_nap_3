@@ -7,9 +7,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.web.multipart.MultipartFile;
@@ -28,7 +25,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -71,9 +67,6 @@ class FileUploadSecurityIT {
 
     @Autowired
     private FileRepository fileRepository;
-
-    @Autowired
-    private TestRestTemplate restTemplate;
 
     private String testUploadedBy = "test-user@example.com";
 
@@ -215,6 +208,7 @@ class FileUploadSecurityIT {
 
     @Test
     @DisplayName("ST-01-E: Upload with valid filename should succeed")
+    @SuppressWarnings("null")
     void testUploadWithValidFilename_Succeeds() throws FileUploadException, InvalidFileTypeException, PathTraversalAttemptException {
         // Arrange
         String validFilename = "document.pdf";
@@ -352,6 +346,7 @@ class FileUploadSecurityIT {
         assertNotNull(response.getSha256Hash(), "SHA-256 hash should be calculated");
 
         // Verify persistence
+        assertNotNull(response.getFileId(), "File ID should not be null");
         Optional<File> persistedFile = fileRepository.findById(response.getFileId());
         assertTrue(persistedFile.isPresent(), "File should be persisted");
         assertTrue(
@@ -364,6 +359,7 @@ class FileUploadSecurityIT {
 
     @Test
     @DisplayName("ST-03-F: Upload valid JPEG image should succeed")
+    @SuppressWarnings("null")
     void testUploadValidImage_WithJpegExtension_Succeeds() throws FileUploadException, InvalidFileTypeException, PathTraversalAttemptException {
         // Arrange
         String imageFilename = "photo.jpg";
@@ -425,6 +421,7 @@ class FileUploadSecurityIT {
 
     @Test
     @DisplayName("ST-05-A: Soft delete file should mark as deleted")
+    @SuppressWarnings("null")
     void testSoftDeleteFile_ShouldMarkAsDeleted() throws FileUploadException, InvalidFileTypeException, PathTraversalAttemptException {
         // Arrange
         String filename = "document.pdf";
@@ -504,6 +501,7 @@ class FileUploadSecurityIT {
 
     @Test
     @DisplayName("ST-06-B: File hash persistence in database")
+    @SuppressWarnings("null")
     void testFileRetrieval_ShouldVerifyHashPersistence() throws FileUploadException, InvalidFileTypeException, PathTraversalAttemptException {
         // Arrange
         // Use unique timestamp to avoid deduplication

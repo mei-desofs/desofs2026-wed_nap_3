@@ -261,6 +261,7 @@ public class FolderController {
         @ApiResponse(responseCode = "410", description = "Folder already deleted"),
         @ApiResponse(responseCode = "401", description = "Unauthorized - missing or invalid bearer token")
     })
+    @SuppressWarnings("null")
     public ResponseEntity<FolderResponse> getFolderById(
             @PathVariable 
             @Parameter(description = "Folder ID to retrieve", required = true)
@@ -345,6 +346,7 @@ public class FolderController {
         @ApiResponse(responseCode = "410", description = "Folder already deleted"),
         @ApiResponse(responseCode = "401", description = "Unauthorized - missing or invalid bearer token")
     })
+    @SuppressWarnings("null")
     public ResponseEntity<FolderResponse> updateFolder(
             @PathVariable 
             @Parameter(description = "Folder ID to update", required = true)
@@ -430,6 +432,7 @@ public class FolderController {
         @ApiResponse(responseCode = "429", description = "Too Many Requests - Rate limit exceeded"),
         @ApiResponse(responseCode = "401", description = "Unauthorized - missing or invalid bearer token")
     })
+    @SuppressWarnings("null")
     public ResponseEntity<FolderDeleteResponse> deleteFolder(
             @PathVariable 
             @Parameter(description = "Folder ID to delete", required = true)

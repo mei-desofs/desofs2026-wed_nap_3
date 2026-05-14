@@ -6,7 +6,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
@@ -27,7 +26,6 @@ import pt.isep.desofs.enderchest.service.dto.UploadResponse;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.Set;
@@ -148,6 +146,7 @@ class FileStorageServiceTest {
         verify(fileVersionRepository, times(1)).save(any(FileVersion.class));
     }
 
+    
     @Test
     @DisplayName("Should detect path traversal in filename (..) and reject")
     void testPathTraversalDetectionWithDotDot() {
@@ -167,6 +166,7 @@ class FileStorageServiceTest {
         verify(fileRepository, never()).save(any(File.class));
     }
 
+    
     @Test
     @DisplayName("Should detect path traversal in filename (/) and reject")
     void testPathTraversalDetectionWithSlash() {
@@ -185,6 +185,7 @@ class FileStorageServiceTest {
         verify(fileRepository, never()).save(any(File.class));
     }
 
+    
     @Test
     @DisplayName("Should reject invalid MIME type (T-06: Web Shell mitigation)")
     void testInvalidMimeTypeRejection() {
@@ -203,6 +204,7 @@ class FileStorageServiceTest {
         verify(fileRepository, never()).save(any(File.class));
     }
 
+    
     @Test
     @DisplayName("Should reject files exceeding size limit")
     void testFileSizeValidation() {
@@ -400,6 +402,7 @@ class FileStorageServiceTest {
 
     // ==================== Soft Delete Tests ====================
 
+  
     @Test
     @DisplayName("Should soft-delete file and create version entry")
     void testSoftDeleteFile() throws FileUploadException {
@@ -455,6 +458,7 @@ class FileStorageServiceTest {
 
     // ==================== Legacy Method Tests ====================
 
+  
     @Test
     @DisplayName("Should support legacy save() method for backward compatibility")
     void testLegacySaveMethod() throws InvalidFileTypeException, PathTraversalAttemptException {

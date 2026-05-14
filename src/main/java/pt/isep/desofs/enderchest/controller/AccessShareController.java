@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.NonNull;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import pt.isep.desofs.enderchest.entity.AccessShare;
@@ -173,7 +174,7 @@ public class AccessShareController {
     public ResponseEntity<AccessShareDeleteResponse> revokeAccessShare(
             @PathVariable 
             @Parameter(description = "Access share ID to revoke", required = true)
-            UUID shareId,
+            @NonNull UUID shareId,
             @RequestHeader(value = "X-User-Id", required = true) 
             @Parameter(description = "User ID (from authentication header), must be resource owner", required = true)
             String userId) {
@@ -181,6 +182,7 @@ public class AccessShareController {
         log.info("Access share revocation initiated by user: {} for shareId: {}", userId, shareId);
 
         // Retrieve share from database
+
         Optional<AccessShare> shareOptional = accessShareRepository.findById(shareId);
 
         if (shareOptional.isEmpty()) {
@@ -192,6 +194,12 @@ public class AccessShareController {
 
         // Record revocation timestamp before deletion
         LocalDateTime revokedAt = LocalDateTime.now();
+
+        if (revokedAt.isBefore(share.getCreatedAt())) {
+            log.warn("Revocation timestamp is before share creation time. ShareId: {}, CreatedAt: {}, RevokedAt: {}",
+                    shareId, share.getCreatedAt(), revokedAt);
+            revokedAt = share.getCreatedAt().plusSeconds(1); // Ensure revokedAt is after createdAt
+        }
 
         // Delete the share record
         accessShareRepository.delete(share);
@@ -296,7 +304,7 @@ public class AccessShareController {
     public ResponseEntity<AccessShareResponse> getAccessShare(
             @PathVariable 
             @Parameter(description = "Access share ID to retrieve", required = true)
-            UUID shareId,
+            @NonNull UUID shareId,
             @RequestHeader(value = "X-User-Id", required = true) 
             @Parameter(description = "User ID (from authentication header)", required = true)
             String userId) {

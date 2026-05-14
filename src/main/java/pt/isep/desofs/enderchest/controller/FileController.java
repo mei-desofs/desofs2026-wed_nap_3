@@ -160,6 +160,7 @@ public class FileController {
      */
     @GetMapping("/{fileId}")
     @Transactional(readOnly = true)
+    @SuppressWarnings("null")
     public ResponseEntity<Resource> downloadFile(
             @PathVariable UUID fileId,
             @RequestHeader(value = "X-User-Id", required = true) String userId) {
@@ -256,6 +257,7 @@ public class FileController {
         @ApiResponse(responseCode = "429", description = "Too Many Requests - Rate limit exceeded"),
         @ApiResponse(responseCode = "401", description = "Unauthorized - missing or invalid bearer token")
     })
+    @SuppressWarnings("null")
     public ResponseEntity<FileDeleteResponse> deleteFile(
             @PathVariable 
             @Parameter(description = "File ID to delete", required = true)

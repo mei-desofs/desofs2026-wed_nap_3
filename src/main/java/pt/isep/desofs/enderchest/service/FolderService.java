@@ -2,6 +2,8 @@ package pt.isep.desofs.enderchest.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pt.isep.desofs.enderchest.entity.Folder;
@@ -341,6 +343,7 @@ public class FolderService {
      *   // Testing/Admin only: Hard delete
      *   folderService.hardDeleteFolder(folderId);
      */
+    @SuppressWarnings("null")
     @Transactional
     public void hardDeleteFolder(UUID folderId) {
         // Verify folder exists
@@ -388,6 +391,7 @@ public class FolderService {
      * Example:
      *   folderService.restoreFolder(deletedFolderId);
      */
+    @SuppressWarnings("null")
     @Transactional
     public void restoreFolder(UUID folderId) {
         Folder folder = folderRepository.findById(folderId)
@@ -471,7 +475,7 @@ public class FolderService {
 
         // If new parent is specified, verify it exists and is not deleted
         if (newParentFolderId != null) {
-            Folder newParent = getFolderByIdOrThrow(newParentFolderId);
+            getFolderByIdOrThrow(newParentFolderId);
 
             // Prevent circular references: check if new parent is a descendant of this folder
             if (isDescendantOf(newParentFolderId, folderId)) {
@@ -503,7 +507,7 @@ public class FolderService {
      * @param potentialAncestor The folder to check as an ancestor
      * @return true if potentialDescendant is a descendant of potentialAncestor
      */
-    private boolean isDescendantOf(UUID potentialDescendant, UUID potentialAncestor) {
+    private boolean isDescendantOf(@NonNull UUID potentialDescendant, UUID potentialAncestor) {
         Optional<Folder> current = folderRepository.findById(potentialDescendant);
         
         while (current.isPresent()) {
@@ -515,8 +519,9 @@ public class FolderService {
             }
 
             // Move up the hierarchy
-            if (folder.getParentFolderId() != null) {
-                current = folderRepository.findById(folder.getParentFolderId());
+            UUID parentId = folder.getParentFolderId();
+            if (parentId != null) {
+                current = folderRepository.findById(parentId);
             } else {
                 // Reached root, ancestor not found
                 break;

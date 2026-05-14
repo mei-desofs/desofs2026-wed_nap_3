@@ -110,6 +110,7 @@ public class FileVersionController {
         @ApiResponse(responseCode = "410", description = "File has been deleted"),
         @ApiResponse(responseCode = "401", description = "Unauthorized - missing or invalid bearer token")
     })
+    @SuppressWarnings("null")
     public ResponseEntity<List<FileVersionResponse>> listFileVersions(
             @PathVariable 
             @Parameter(description = "File ID to retrieve versions for", required = true)
@@ -195,6 +196,7 @@ public class FileVersionController {
         @ApiResponse(responseCode = "410", description = "File has been deleted"),
         @ApiResponse(responseCode = "401", description = "Unauthorized - missing or invalid bearer token")
     })
+    @SuppressWarnings("null")
     public ResponseEntity<FileVersionResponse> getFileVersion(
             @PathVariable 
             @Parameter(description = "File ID", required = true)
