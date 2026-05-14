@@ -209,7 +209,7 @@ public interface FileVersionRepository extends JpaRepository<FileVersion, UUID> 
      * @param fileId The ID of the file
      * @return Optional containing the initial FileVersion
      */
-    Optional<FileVersion> findByFileIdAndVersionNumber(UUID fileId, int versionNumber);
+    Optional<FileVersion> findByFileIdAndVersionNumber(UUID fileId, Integer versionNumber);
 
     /**
      * Delete all versions of a file (cleanup operation).
