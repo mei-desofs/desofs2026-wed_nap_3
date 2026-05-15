@@ -17,6 +17,10 @@
     <properties>
         <java.version>21</java.version>
         <lombok.version>1.18.36</lombok.version>
+        <!-- CVE overrides: pin transitive deps to patched versions (SDR-07) -->
+        <tomcat.version>10.1.55</tomcat.version>
+        <log4j2.version>2.25.4</log4j2.version>
+        <postgresql.version>42.7.11</postgresql.version>
     </properties>
 
     <dependencies>
@@ -57,7 +61,7 @@
         <dependency>
             <groupId>org.apache.tika</groupId>
             <artifactId>tika-core</artifactId>
-            <version>2.9.1</version>
+            <version>3.2.2</version>
         </dependency>
 
         <!-- Configuração Segura: Para ler ficheiros .properties de forma segura -->
@@ -79,7 +83,7 @@
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-            <version>2.0.4</version>
+            <version>2.5.0</version>
         </dependency>
 
         <!-- Testes: Para garantir a qualidade e segurança -->
@@ -126,6 +130,47 @@
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
+            </plugin>
+
+            <!-- SCA: Fails the build if any dependency has CVSS >= 7.0 (HIGH) -->
+            <plugin>
+                <groupId>org.owasp</groupId>
+                <artifactId>dependency-check-maven</artifactId>
+                <version>10.0.4</version>
+                <configuration>
+                    <!-- CVSS >= 7.0 = HIGH severity threshold (SDR-07) -->
+                    <failBuildOnCVSS>7</failBuildOnCVSS>
+                    <formats>
+                        <format>HTML</format>
+                        <format>JSON</format>
+                    </formats>
+                    <!-- Explicit data dir so the CI cache path is predictable -->
+                    <dataDirectory>${user.home}/.dependency-check-data</dataDirectory>
+                    <suppressionFiles>
+                        <suppressionFile>owasp-suppressions.xml</suppressionFile>
+                    </suppressionFiles>
+                </configuration>
+            </plugin>
+
+            <!-- Coverage: generates jacoco.xml for CI coverage reports -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.12</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
