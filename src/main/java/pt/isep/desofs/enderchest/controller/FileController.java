@@ -21,8 +21,12 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import pt.isep.desofs.enderchest.entity.AccessShare;
 import pt.isep.desofs.enderchest.entity.File;
+import pt.isep.desofs.enderchest.entity.User;
+import pt.isep.desofs.enderchest.repository.AccessShareRepository;
 import pt.isep.desofs.enderchest.repository.FileRepository;
+import pt.isep.desofs.enderchest.repository.UserRepository;
 import pt.isep.desofs.enderchest.service.FileStorageService;
 import pt.isep.desofs.enderchest.service.dto.FileDeleteResponse;
 import pt.isep.desofs.enderchest.service.dto.UploadResponse;
@@ -70,6 +74,8 @@ public class FileController {
 
     private final FileStorageService fileStorageService;
     private final FileRepository fileRepository;
+    private final AccessShareRepository accessShareRepository;
+    private final UserRepository userRepository;
 
     /**
      * Upload a file to storage.
@@ -145,6 +151,12 @@ public class FileController {
         if (!file.isActive()) {
             log.warn("File has been deleted. FileId: {}", fileId);
             return ResponseEntity.status(HttpStatus.GONE).build();
+        }
+
+        // IDOR check (AC-04 / ST-02): verify caller is the owner OR has an AccessShare record
+        if (!hasReadAccess(file, jwt)) {
+            log.warn("IDOR attempt blocked: user {} attempted to access file {} without permission", userId, fileId);
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
 
         try {
@@ -225,6 +237,12 @@ public class FileController {
             return ResponseEntity.status(HttpStatus.GONE).build();
         }
 
+        // IDOR check (AC-04 / ST-02): verify caller is the owner OR has an OWNER-level AccessShare record
+        if (!hasOwnerAccess(file, jwt)) {
+            log.warn("IDOR attempt blocked: user {} attempted to delete file {} without ownership", userId, fileId);
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+
         file.softDelete();
         fileRepository.save(file);
 
@@ -259,6 +277,86 @@ public class FileController {
     })
     public ResponseEntity<String> adminHealth() {
         return ResponseEntity.ok("Admin health check: OK");
+    }
+
+    /**
+     * IDOR Prevention (AC-04 / ST-02): Check if caller has read access to a file.
+     *
+     * A user has read access if:
+     * 1. They are the uploader (owner by creation), OR
+     * 2. They have an explicit AccessShare record (OWNER, EDITOR or VIEWER) for this file.
+     *
+     * The caller's internal User UUID is resolved via the "email" claim in the JWT
+     * (Auth0 includes email as a standard claim).
+     */
+    private boolean hasReadAccess(File file, Jwt jwt) {
+        String jwtSub = jwt.getSubject();
+
+        // Check 1: uploader is always allowed
+        if (file.getUploadedBy().equals(jwtSub)) {
+            return true;
+        }
+
+        // Check 2: look for an AccessShare record
+        Optional<UUID> callerUuid = resolveUserUuid(jwt);
+        if (callerUuid.isEmpty()) {
+            log.warn("IDOR check: could not resolve internal UUID for subject={}", jwtSub);
+            return false;
+        }
+
+        Optional<AccessShare> share = accessShareRepository
+                .findByResourceIdAndResourceTypeAndGrantedToUserId(
+                        file.getId(), AccessShare.ResourceType.FILE, callerUuid.get());
+
+        return share.isPresent(); // any role (OWNER/EDITOR/VIEWER) grants read
+    }
+
+    /**
+     * IDOR Prevention (AC-04 / ST-02): Check if caller has OWNER-level access to a file.
+     *
+     * A user has owner access if:
+     * 1. They are the uploader (owner by creation), OR
+     * 2. They have an explicit AccessShare record with RoleType.OWNER for this file.
+     */
+    private boolean hasOwnerAccess(File file, Jwt jwt) {
+        String jwtSub = jwt.getSubject();
+
+        // Check 1: uploader is always the owner
+        if (file.getUploadedBy().equals(jwtSub)) {
+            return true;
+        }
+
+        // Check 2: look for an OWNER-level AccessShare record
+        Optional<UUID> callerUuid = resolveUserUuid(jwt);
+        if (callerUuid.isEmpty()) {
+            log.warn("IDOR owner check: could not resolve internal UUID for subject={}", jwtSub);
+            return false;
+        }
+
+        Optional<AccessShare> share = accessShareRepository
+                .findByResourceIdAndResourceTypeAndGrantedToUserId(
+                        file.getId(), AccessShare.ResourceType.FILE, callerUuid.get());
+
+        return share.isPresent() && share.get().isOwner();
+    }
+
+    /**
+     * Resolve the internal system UUID for the JWT caller.
+     *
+     * Auth0 JWTs include the user's email as the "email" claim.
+     * We look up the User entity by that email to obtain the internal UUID
+     * used in AccessShare records.
+     *
+     * Returns empty if the user has no local User record (e.g. first-time users
+     * who have authenticated but not yet been provisioned).
+     */
+    private Optional<UUID> resolveUserUuid(Jwt jwt) {
+        String email = jwt.getClaimAsString("email");
+        if (email == null || email.isBlank()) {
+            return Optional.empty();
+        }
+        return userRepository.findByEmail(email)
+                .map(User::getUserId);
     }
 
     /**
