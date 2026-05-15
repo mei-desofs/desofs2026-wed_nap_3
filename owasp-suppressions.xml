@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.4.xsd"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.4.xsd
+                                  https://dependency-check.github.io/DependencyCheck/dependency-suppression.1.4.xsd">
+
+    <!--
+        SUPPRESSION POLICY
+        ==================
+        Each entry requires:
+          1. A CDATA notes block with: the CVE, why it cannot be fixed, and reviewer + review date.
+          2. A specific CVE tag - not a score range - to target only the known finding.
+          3. Annual review obligation noted inside the block.
+
+        Do NOT suppress a CVE because fixing it is inconvenient.
+        Suppress ONLY when the attack vector is demonstrably not reachable in this application,
+        or when the fix requires a Spring Boot major version upgrade that is out of scope for
+        the current sprint and is tracked as a known gap.
+    -->
+
+    <!-- ================================================================
+         angus-activation - Transitive, Jakarta Mail not used
+         ================================================================ -->
+    <suppress>
+        <notes><![CDATA[
+        CVE-2025-7962 - org.eclipse.angus:angus-activation:2.0.2
+        Transitive dependency from Spring Boot Jakarta EE compliance layer.
+        EnderChest has no Jakarta Mail or email functionality; the vulnerable
+        activation-handler code path (requires javax.mail / jakarta.mail on the
+        call stack) is never reached.
+        Reviewed: 2026-05-14 by Pedro Conceicao. Next review: 2027-05-14.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.eclipse\.angus/angus-activation@.*$</packageUrl>
+        <cve>CVE-2025-7962</cve>
+    </suppress>
+
+    <!-- ================================================================
+         nimbus-jose-jwt 9.24.4 - CVE-2023-52428 - JWE/ECDH not used
+         ================================================================ -->
+    <suppress>
+        <notes><![CDATA[
+        CVE-2023-52428 - com.nimbusds:nimbus-jose-jwt:9.24.4
+        The vulnerability is a DoS via CPU exhaustion when parsing a JWE header
+        with ECDH key agreement algorithms. EnderChest is an OAuth2 Resource Server
+        that validates JWS (signed) JWTs issued by Auth0. It does NOT process JWE
+        (encrypted) tokens. Auth0 tokens use RS256/ES256 signature; the ECDH JWE
+        parsing code path is never executed. The attack requires an attacker to
+        inject a crafted JWE token, which Auth0 would never issue.
+        Upgrading requires breaking out of the Spring Boot 3.2.5 BOM.
+        Reviewed: 2026-05-14 by Pedro Conceicao. Next review: 2027-05-14.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/com\.nimbusds/nimbus-jose-jwt@.*$</packageUrl>
+        <cve>CVE-2023-52428</cve>
+    </suppress>
+
+    <!-- ================================================================
+         Spring Framework 6.1.6 - Requires Spring Boot upgrade to fix
+         Spring Boot 3.2.5 pins Spring Framework to 6.1.x. Upgrading
+         Spring Framework independently is unsupported. Fix is deferred
+         to the sprint that upgrades Spring Boot to 3.4.x or later.
+         ================================================================ -->
+    <suppress>
+        <notes><![CDATA[
+        CVE-2026-22740, CVE-2026-22741, CVE-2026-22745 - spring-core / spring-web 6.1.6
+        Spring Framework 6.1.6 is pinned by Spring Boot 3.2.5. These CVEs require
+        Spring Framework 6.1.x to be upgraded, which is only possible by upgrading
+        Spring Boot to 3.4.x or later. That upgrade is out of scope for Sprint 2.
+        Tracked as a known gap: upgrade Spring Boot to 3.4.x in a future sprint.
+        Reviewed: 2026-05-14 by Pedro Conceicao. Next review: 2026-08-14.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-core@.*$</packageUrl>
+        <cve>CVE-2026-22740</cve>
+    </suppress>
+    <suppress>
+        <notes><![CDATA[
+        See spring-core CVE-2026-22740 suppression above for full rationale.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-core@.*$</packageUrl>
+        <cve>CVE-2026-22741</cve>
+    </suppress>
+    <suppress>
+        <notes><![CDATA[
+        See spring-core CVE-2026-22740 suppression above for full rationale.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-core@.*$</packageUrl>
+        <cve>CVE-2026-22745</cve>
+    </suppress>
+    <suppress>
+        <notes><![CDATA[
+        See spring-core CVE-2026-22740 suppression above for full rationale.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-web@.*$</packageUrl>
+        <cve>CVE-2026-22740</cve>
+    </suppress>
+    <suppress>
+        <notes><![CDATA[
+        See spring-core CVE-2026-22740 suppression above for full rationale.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-web@.*$</packageUrl>
+        <cve>CVE-2026-22741</cve>
+    </suppress>
+    <suppress>
+        <notes><![CDATA[
+        See spring-core CVE-2026-22740 suppression above for full rationale.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-web@.*$</packageUrl>
+        <cve>CVE-2026-22745</cve>
+    </suppress>
+    <suppress>
+        <notes><![CDATA[
+        CVE-2026-41238 - spring-web 6.1.6
+        Spring Framework 6.1.6 is pinned by Spring Boot 3.2.5.
+        Fix requires Spring Boot upgrade to 3.4.x or later (out of scope for Sprint 2).
+        Reviewed: 2026-05-14 by Pedro Conceicao. Next review: 2026-08-14.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-web@.*$</packageUrl>
+        <cve>CVE-2026-41238</cve>
+    </suppress>
+
+    <!-- ================================================================
+         commons-lang3 3.13.0 - Spring Boot managed, cannot override version
+         ================================================================ -->
+    <suppress>
+        <notes><![CDATA[
+        CVE-2025-48924 - org.apache.commons:commons-lang3:3.13.0
+        commons-lang3 is managed by Spring Boot 3.2.5 BOM. EnderChest uses
+        commons-lang3 only through Spring internals (string utilities); no user-
+        controlled input is passed through the vulnerable API surface.
+        A fix requires either a Spring Boot upgrade or an explicit version override
+        once a patched version is confirmed. Tracked for next sprint review.
+        Reviewed: 2026-05-14 by Pedro Conceicao. Next review: 2026-08-14.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.apache\.commons/commons-lang3@.*$</packageUrl>
+        <cve>CVE-2025-48924</cve>
+    </suppress>
+
+    <!-- ================================================================
+         hibernate-core 6.4.4.Final - Spring Boot managed
+         ================================================================ -->
+    <suppress>
+        <notes><![CDATA[
+        CVE-2025-15104 - org.hibernate.orm:hibernate-core:6.4.4.Final
+        Hibernate 6.4.4.Final is managed by Spring Boot 3.2.5 BOM.
+        EnderChest uses Hibernate only for JPA entity mapping with parameterised
+        queries generated by Spring Data JPA; no raw HQL or native queries
+        with user-supplied input are constructed.
+        Fix requires Spring Boot upgrade. Tracked for next sprint.
+        Reviewed: 2026-05-14 by Pedro Conceicao. Next review: 2026-08-14.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.hibernate\.orm/hibernate-core@.*$</packageUrl>
+        <cve>CVE-2025-15104</cve>
+    </suppress>
+
+</suppressions>

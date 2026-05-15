@@ -6,38 +6,74 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity(prePostEnabled = true) // Essencial para o RBAC com @PreAuthorize
 public class SecurityConfig {
 
+    // Namespace do claim customizado configurado na Action do Auth0.
+    // Corresponde ao identifier da API: https://enderchest-api
+    private static final String ROLES_CLAIM = "https://enderchest-api/roles";
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            // Desativar CSRF, pois a API é stateless e não usa cookies para autenticação.
-            .csrf(csrf -> csrf.disable())
+                // Desativar CSRF — API stateless, não usa cookies para autenticação (SDR-01)
+                .csrf(csrf -> csrf.disable())
 
-            // Garantir que a API é stateless, não criando sessões HTTP.
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // Garantir que a API é stateless — sem sessões HTTP (SDR-01)
+                .sessionManagement(session -> session
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-            // Configurar as regras de autorização para todos os endpoints.
-            .authorizeHttpRequests(authz -> authz
-                // Permitir acesso público a Swagger/OpenAPI
-                .requestMatchers(
-                    "/swagger-ui/**",
-                    "/swagger-ui.html",
-                    "/v3/api-docs/**",
-                    "/webjars/**"
-                ).permitAll()
-                // Por defeito, todas as requests exigem um utilizador autenticado.
-                .anyRequest().authenticated()
-            )
+                // Configurar regras de autorização
+                .authorizeHttpRequests(authz -> authz
+                        // Permitir acesso público a Swagger/OpenAPI
+                        .requestMatchers(
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/v3/api-docs/**",
+                                "/webjars/**"
+                        ).permitAll()
+                        // Todas as outras requests exigem autenticação
+                        .anyRequest().authenticated()
+                )
 
-            // Configurar a validação de JWTs (OAuth2 Resource Server).
-            .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {})); 
+                // Configurar validação de JWTs com conversor customizado para Auth0
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .jwt(jwt -> jwt
+                                .jwtAuthenticationConverter(jwtAuthenticationConverter())
+                        )
+                );
 
         return http.build();
+    }
+    
+    @Bean
+    public JwtAuthenticationConverter jwtAuthenticationConverter() {
+        JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
+
+        converter.setJwtGrantedAuthoritiesConverter(jwt -> {
+            // Ler roles do claim customizado injetado pela Action do Auth0
+            List<String> roles = jwt.getClaimAsStringList(ROLES_CLAIM);
+
+            if (roles == null || roles.isEmpty()) {
+                return Collections.emptyList();
+            }
+
+            // Converter "OWNER" -> "ROLE_OWNER" para compatibilidade com @PreAuthorize
+            return roles.stream()
+                    .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
+                    .collect(Collectors.toList());
+        });
+
+        return converter;
     }
 }
