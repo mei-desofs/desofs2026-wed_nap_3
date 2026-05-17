@@ -479,7 +479,7 @@ class FileStorageServiceTest {
         when(fileVersionRepository.save(any(FileVersion.class))).thenReturn(new FileVersion());
 
         // Act
-        fileStorageService.save(uploadFile);
+        fileStorageService.uploadFile(uploadFile, "testUser");
 
         // Assert - verify no exception thrown
         verify(fileRepository, times(1)).save(any(File.class));

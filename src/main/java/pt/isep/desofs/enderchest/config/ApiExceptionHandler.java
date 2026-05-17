@@ -8,7 +8,9 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import pt.isep.desofs.enderchest.exception.resource.CircularReferenceFolderException;
 import pt.isep.desofs.enderchest.exception.resource.FolderNotFoundException;
+import pt.isep.desofs.enderchest.exception.resource.InvalidFolderNameException;
 import pt.isep.desofs.enderchest.exception.resource.StorageQuotaExceededException;
 import pt.isep.desofs.enderchest.exception.security.FileUploadException;
 import pt.isep.desofs.enderchest.exception.security.InvalidFileTypeException;
@@ -107,6 +109,56 @@ public class ApiExceptionHandler {
         log.warn("Folder not found: {}", ex.getMessage());
 
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+    }
+
+    /**
+     * Handle invalid folder name exceptions.
+     *
+     * Returns 400 Bad Request when folder name is invalid (null, blank, or contains illegal characters).
+     * This can occur during folder creation or renaming operations.
+     *
+     * @param ex InvalidFolderNameException
+     * @return ResponseEntity with error details
+     */
+    @ExceptionHandler(InvalidFolderNameException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ResponseEntity<Map<String, Object>> handleInvalidFolderName(
+            InvalidFolderNameException ex) {
+
+        Map<String, Object> error = new HashMap<>();
+        error.put("timestamp", LocalDateTime.now());
+        error.put("status", HttpStatus.BAD_REQUEST.value());
+        error.put("error", "Bad Request");
+        error.put("message", ex.getMessage());
+
+        log.warn("Invalid folder name: {}", ex.getMessage());
+
+        return ResponseEntity.badRequest().body(error);
+    }
+
+    /**
+     * Handle circular reference folder exceptions.
+     *
+     * Returns 400 Bad Request when attempting to move a folder into one of its descendants,
+     * which would create a circular reference and break the folder hierarchy.
+     *
+     * @param ex CircularReferenceFolderException
+     * @return ResponseEntity with error details
+     */
+    @ExceptionHandler(CircularReferenceFolderException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ResponseEntity<Map<String, Object>> handleCircularReferenceFolder(
+            CircularReferenceFolderException ex) {
+
+        Map<String, Object> error = new HashMap<>();
+        error.put("timestamp", LocalDateTime.now());
+        error.put("status", HttpStatus.BAD_REQUEST.value());
+        error.put("error", "Bad Request");
+        error.put("message", ex.getMessage());
+
+        log.warn("Circular reference folder detected: {}", ex.getMessage());
+
+        return ResponseEntity.badRequest().body(error);
     }
 
     /**
