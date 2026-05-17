@@ -21,6 +21,7 @@
         <tomcat.version>10.1.55</tomcat.version>
         <log4j2.version>2.25.4</log4j2.version>
         <postgresql.version>42.7.11</postgresql.version>
+        <sonar.organization>mei-desofs-wed-nap-3</sonar.organization>
     </properties>
 
     <dependencies>
