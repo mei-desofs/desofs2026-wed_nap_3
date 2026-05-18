@@ -3,6 +3,7 @@ package pt.isep.desofs.enderchest.repository;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Repository;
 import pt.isep.desofs.enderchest.entity.File;
 
@@ -61,6 +62,7 @@ public interface FileRepository extends JpaRepository<File, UUID> {
      * @param id The file UUID
      * @return Optional containing the File if found and active, empty otherwise
      */
+    @NonNull
     Optional<File> findByIdAndIsDeletedFalse(UUID id);
 
     /**
@@ -181,6 +183,7 @@ public interface FileRepository extends JpaRepository<File, UUID> {
      * @param folderId The folder UUID to search within
      * @return List of active files in the specified folder (empty if no files)
      */
+    @NonNull
     List<File> findByFolderIdAndIsDeletedFalse(UUID folderId);
 
     /**
@@ -193,6 +196,7 @@ public interface FileRepository extends JpaRepository<File, UUID> {
      * @param ownerId User ID (UUID) to search for
      * @return List of active files for the user (empty if no files)
      */
+    @NonNull
     @Query("""
         SELECT f FROM File f 
         WHERE f.uploadedBy = CAST(:ownerId AS string)
@@ -217,6 +221,7 @@ public interface FileRepository extends JpaRepository<File, UUID> {
         WHERE f.uploadedBy = CAST(:ownerId AS string)
         AND f.isDeleted = false
     """)
+    @NonNull
     Long calculateUserStorageUsage(@Param("ownerId") UUID ownerId);
 
     /**
@@ -234,4 +239,19 @@ public interface FileRepository extends JpaRepository<File, UUID> {
         AND f.isDeleted = false
     """)
     Long calculateUserStorageUsageByString(@Param("ownerId") String ownerId);
+
+    /**
+     * Calculate total storage usage by summing File sizes for a user.
+     *
+     * This query aggregates file sizes for all files owned by a user.
+     * Used for accurate storage quota enforcement and analytics.
+     *
+     * @param username The username (uploadedBy field) to calculate storage for
+     * @return Total storage used in bytes (sum of all file sizes for active files)
+     */
+    @Query("""
+        SELECT COALESCE(SUM(f.fileSize), 0L) FROM File f 
+        WHERE f.uploadedBy = :username AND f.isDeleted = false
+    """)
+    long sumFileSizeByUploadedBy(@Param("username") String username);
 }

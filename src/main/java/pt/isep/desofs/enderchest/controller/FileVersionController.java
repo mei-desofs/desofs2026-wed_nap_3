@@ -15,12 +15,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import pt.isep.desofs.enderchest.entity.FileVersion;
-import pt.isep.desofs.enderchest.repository.FileRepository;
-import pt.isep.desofs.enderchest.repository.FileVersionRepository;
+import pt.isep.desofs.enderchest.exception.resource.FileNotFoundException;
+import pt.isep.desofs.enderchest.exception.resource.FileVersionNotFoundException;
+import pt.isep.desofs.enderchest.service.FileVersionService;
 import pt.isep.desofs.enderchest.service.dto.FileVersionResponse;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -56,8 +56,7 @@ import java.util.stream.Collectors;
 @SecurityRequirement(name = "bearer-jwt")
 public class FileVersionController {
 
-    private final FileVersionRepository fileVersionRepository;
-    private final FileRepository fileRepository;
+    private final FileVersionService fileVersionService;
 
     /**
      * List all versions of a file.
@@ -110,7 +109,6 @@ public class FileVersionController {
         @ApiResponse(responseCode = "410", description = "File has been deleted"),
         @ApiResponse(responseCode = "401", description = "Unauthorized - missing or invalid bearer token")
     })
-    @SuppressWarnings("null")
     public ResponseEntity<List<FileVersionResponse>> listFileVersions(
             @PathVariable 
             @Parameter(description = "File ID to retrieve versions for", required = true)
@@ -121,38 +119,35 @@ public class FileVersionController {
 
         log.info("File versions listing initiated by user: {} for fileId: {}", userId, fileId);
 
-        // Verify file exists
-        if (!fileRepository.existsById(fileId)) {
-            log.warn("File not found. FileId: {}", fileId);
+        try {
+            // Delegate to service - handles file existence checks and version retrieval
+            List<FileVersion> versions = fileVersionService.listFileVersionsByFileId(fileId);
+
+            log.info("Found {} versions for file: {}", versions.size(), fileId);
+
+            // Convert to response DTOs
+            List<FileVersionResponse> responses = versions.stream()
+                    .map(version -> new FileVersionResponse(
+                            version.getId(),
+                            version.getVersionNumber(),
+                            version.getSha256Hash(),
+                            version.getModifiedAt(),
+                            version.getModifiedBy(),
+                            version.getChangeDescription(),
+                            version.getCreatedAt()
+                    ))
+                    .collect(Collectors.toList());
+
+            return ResponseEntity.ok(responses);
+        } catch (FileNotFoundException e) {
+            // FileNotFoundException is thrown when file not found or is deleted
+            log.warn("File not found or deleted. FileId: {}", fileId);
+            // Check if it's a deleted file (message contains "deleted") to return 410 instead of 404
+            if (e.getMessage() != null && e.getMessage().contains("deleted")) {
+                return ResponseEntity.status(HttpStatus.GONE).build();
+            }
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
-
-        // Check if file is deleted
-        var fileOptional = fileRepository.findById(fileId);
-        if (fileOptional.isPresent() && fileOptional.get().getIsDeleted()) {
-            log.warn("File has been deleted. FileId: {}", fileId);
-            return ResponseEntity.status(HttpStatus.GONE).build();
-        }
-
-        // Retrieve all versions for the file, sorted by version number
-        List<FileVersion> versions = fileVersionRepository.findByFileIdOrderByVersionNumberAsc(fileId);
-
-        log.info("Found {} versions for file: {}", versions.size(), fileId);
-
-        // Convert to response DTOs
-        List<FileVersionResponse> responses = versions.stream()
-                .map(version -> new FileVersionResponse(
-                        version.getId(),
-                        version.getVersionNumber(),
-                        version.getSha256Hash(),
-                        version.getModifiedAt(),
-                        version.getModifiedBy(),
-                        version.getChangeDescription(),
-                        version.getCreatedAt()
-                ))
-                .collect(Collectors.toList());
-
-        return ResponseEntity.ok(responses);
     }
 
     /**
@@ -210,49 +205,36 @@ public class FileVersionController {
 
         log.info("File version retrieval initiated by user: {} for versionId: {}", userId, versionId);
 
-        // Verify file exists
-        if (!fileRepository.existsById(fileId)) {
-            log.warn("File not found. FileId: {}", fileId);
+        try {
+            // Delegate to service - handles file existence checks and version validation
+            FileVersion version = fileVersionService.getFileVersionById(fileId, versionId);
+
+            log.info("File version retrieved successfully. VersionId: {}, VersionNumber: {}, Hash: {}",
+                    versionId, version.getVersionNumber(), version.getSha256Hash());
+
+            // Build response
+            FileVersionResponse response = new FileVersionResponse(
+                    version.getId(),
+                    version.getVersionNumber(),
+                    version.getSha256Hash(),
+                    version.getModifiedAt(),
+                    version.getModifiedBy(),
+                    version.getChangeDescription(),
+                    version.getCreatedAt()
+            );
+
+            return ResponseEntity.ok(response);
+        } catch (FileNotFoundException e) {
+            // FileNotFoundException is thrown when file not found or is deleted
+            log.warn("File not found or deleted. FileId: {}", fileId);
+            // Check if it's a deleted file (message contains "deleted") to return 410 instead of 404
+            if (e.getMessage() != null && e.getMessage().contains("deleted")) {
+                return ResponseEntity.status(HttpStatus.GONE).build();
+            }
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        }
-
-        // Check if file is deleted
-        var fileOptional = fileRepository.findById(fileId);
-        if (fileOptional.isPresent() && fileOptional.get().getIsDeleted()) {
-            log.warn("File has been deleted. FileId: {}", fileId);
-            return ResponseEntity.status(HttpStatus.GONE).build();
-        }
-
-        // Retrieve specific version
-        Optional<FileVersion> versionOptional = fileVersionRepository.findById(versionId);
-
-        if (versionOptional.isEmpty()) {
+        } catch (FileVersionNotFoundException e) {
             log.warn("File version not found. VersionId: {}", versionId);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
-
-        FileVersion version = versionOptional.get();
-
-        // Verify version belongs to the requested file
-        if (!version.getFile().getId().equals(fileId)) {
-            log.warn("Version does not belong to file. FileId: {}, VersionId: {}", fileId, versionId);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        }
-
-        log.info("File version retrieved successfully. VersionId: {}, VersionNumber: {}, Hash: {}",
-                versionId, version.getVersionNumber(), version.getSha256Hash());
-
-        // Build response
-        FileVersionResponse response = new FileVersionResponse(
-                version.getId(),
-                version.getVersionNumber(),
-                version.getSha256Hash(),
-                version.getModifiedAt(),
-                version.getModifiedBy(),
-                version.getChangeDescription(),
-                version.getCreatedAt()
-        );
-
-        return ResponseEntity.ok(response);
     }
 }
