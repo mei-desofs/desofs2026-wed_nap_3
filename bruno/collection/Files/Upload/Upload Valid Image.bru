@@ -1,0 +1,35 @@
+meta {
+  name: Upload Valid Image
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/api/v1/files/upload
+  body: multipart-form
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:multipart-form {
+  file: @file(test-files/photo.jpg)
+}
+
+script:after-response {
+  if (res.status === 201 && res.body.fileId) {
+    bru.setVar("last_file_id", res.body.fileId);
+    console.log("File ID saved: " + res.body.fileId);
+  }
+}
+
+docs {
+  Upload de imagem JPEG válida.
+  
+  Expected: 201 Created com mimeType: image/jpeg e sha256Hash.
+  
+  Ficheiro necessário: test-files/photo.jpg
+  (Criar com: printf '\xFF\xD8\xFF' > test-files/photo.jpg)
+}

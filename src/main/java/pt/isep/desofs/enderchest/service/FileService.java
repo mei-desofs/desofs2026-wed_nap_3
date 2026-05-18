@@ -62,14 +62,14 @@ public class FileService {
      * 2. Caller has an AccessShare record for this file
      *
      * @param fileId UUID of the file to download
-     * @param callerEmail Email from JWT to resolve caller identity
+     * @param userId User ID from JWT subject to verify caller identity
      * @return File entity if access is granted
      * @throws FileNotFoundException if file not found or is deleted
      * @throws FileAccessDeniedException if caller lacks read access
      */
     @Transactional(readOnly = true)
     @NonNull
-    public File downloadFile(@NonNull UUID fileId, @NonNull String callerEmail) throws FileNotFoundException, FileAccessDeniedException {
+    public File downloadFile(@NonNull UUID fileId, @NonNull String userId) throws FileNotFoundException, FileAccessDeniedException {
 
         // Retrieve file
         Optional<File> fileOptional = fileRepository.findById(fileId);
@@ -87,13 +87,13 @@ public class FileService {
         }
 
         // Check read access (IDOR prevention)
-        if (!hasReadAccess(file, callerEmail)) {
+        if (!hasReadAccess(file, userId)) {
             log.warn("IDOR attempt blocked: user {} attempted to access file {} without permission",
-                    callerEmail, fileId);
+                    userId, fileId);
             throw new FileAccessDeniedException(fileId, null);
         }
 
-        log.info("File download verified. FileId: {}, Caller: {}", fileId, callerEmail);
+        log.info("File download verified. FileId: {}, Caller: {}", fileId, userId);
 
         return file;
     }
@@ -107,12 +107,12 @@ public class FileService {
      * 2. Caller has an OWNER-level AccessShare record for this file
      *
      * @param fileId UUID of the file to delete
-     * @param callerEmail Email from JWT to resolve caller identity
+     * @param userId User ID from JWT subject to verify caller identity
      * @throws FileNotFoundException if file not found or is deleted
      * @throws FileAccessDeniedException if caller lacks owner-level access
      */
     @Transactional
-    public void deleteFile(@NonNull UUID fileId, @NonNull String callerEmail)
+    public void deleteFile(@NonNull UUID fileId, @NonNull String userId)
             throws FileNotFoundException, FileAccessDeniedException {
 
         // Retrieve file
@@ -131,9 +131,9 @@ public class FileService {
         }
 
         // Check owner access (IDOR prevention)
-        if (!hasOwnerAccess(file, callerEmail)) {
+        if (!hasOwnerAccess(file, userId)) {
             log.warn("IDOR attempt blocked: user {} attempted to delete file {} without ownership",
-                    callerEmail, fileId);
+                    userId, fileId);
             throw new FileAccessDeniedException(fileId, null);
         }
 
@@ -142,7 +142,7 @@ public class FileService {
         fileRepository.save(file);
 
         log.info("File deleted successfully. FileId: {}, DeletedAt: {}, Caller: {}",
-                fileId, file.getDeletedAt(), callerEmail);
+                fileId, file.getDeletedAt(), userId);
     }
 
     /**
@@ -153,19 +153,19 @@ public class FileService {
      * 2. They have an explicit AccessShare record (OWNER, EDITOR or VIEWER) for this file
      *
      * @param file The file to check access for
-     * @param callerEmail The caller's email (from JWT)
+     * @param userId The caller's user ID (from JWT subject)
      * @return true if caller has read access, false otherwise
      */
-    private boolean hasReadAccess(@NonNull File file, @NonNull String callerEmail) {
+    private boolean hasReadAccess(@NonNull File file, @NonNull String userId) {
         // Check 1: uploader is always allowed
-        if (file.getUploadedBy().equals(callerEmail)) {
+        if (file.getUploadedBy().equals(userId)) {
             return true;
         }
 
         // Check 2: look for an AccessShare record
-        Optional<UUID> callerUuid = resolveUserUuid(callerEmail);
+        Optional<UUID> callerUuid = resolveUserUuid(userId);
         if (callerUuid.isEmpty()) {
-            log.warn("IDOR check: could not resolve internal UUID for email={}", callerEmail);
+            log.warn("IDOR check: could not resolve internal UUID for userId={}", userId);
             return false;
         }
 
@@ -184,19 +184,19 @@ public class FileService {
      * 2. They have an explicit OWNER-level AccessShare record for this file
      *
      * @param file The file to check access for
-     * @param callerEmail The caller's email (from JWT)
+     * @param userId The caller's user ID (from JWT subject)
      * @return true if caller has owner access, false otherwise
      */
-    private boolean hasOwnerAccess(@NonNull File file, @NonNull String callerEmail) {
+    private boolean hasOwnerAccess(@NonNull File file, @NonNull String userId) {
         // Check 1: uploader is always the owner
-        if (file.getUploadedBy().equals(callerEmail)) {
+        if (file.getUploadedBy().equals(userId)) {
             return true;
         }
 
         // Check 2: look for an OWNER-level AccessShare record
-        Optional<UUID> callerUuid = resolveUserUuid(callerEmail);
+        Optional<UUID> callerUuid = resolveUserUuid(userId);
         if (callerUuid.isEmpty()) {
-            log.warn("IDOR owner check: could not resolve internal UUID for email={}", callerEmail);
+            log.warn("IDOR owner check: could not resolve internal UUID for userId={}", userId);
             return false;
         }
 
