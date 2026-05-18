@@ -283,19 +283,22 @@ JaCoCo instruction coverage from a full local build including all 4 test classes
 
 The pipeline consists of four jobs triggered on every push to `main` and every pull request. Jobs 2–4 run in parallel after Job 1 passes:
 
-```
-                          ┌──────────────────────────┐
-                     ┌───▶│ Job 2: SCA               │
-                     │    │ OWASP Dependency-Check   │
-┌──────────────────┐ │    └──────────────────────────┘
-│ Job 1:           │─┤    ┌──────────────────────────┐
-│ Build & Test     │ ├───▶│ Job 3: SAST              │
-│ mvn clean install│ │    │ SonarCloud               │
-└──────────────────┘ │    └──────────────────────────┘
-                     │    ┌──────────────────────────┐
-                     └───▶│ Job 4: Container Scan    │
-                          │ Trivy                    │
-                          └──────────────────────────┘
+```mermaid
+flowchart TD
+    trigger([Push / Pull Request to main])
+    trigger --> build
+
+    build["Job 1 — Build & Test<br/>mvn clean install<br/>H2 in-memory DB · JaCoCo coverage"]
+
+    build --> sca
+    build --> sonar
+    build --> trivy
+
+    sca["Job 2 — SCA<br/>OWASP Dependency-Check<br/>Fails on CVSS ≥ 7.0"]
+    sonar["Job 3 — SAST<br/>SonarCloud<br/>Code quality + security rules"]
+    trivy["Job 4 — Container Scan<br/>Trivy<br/>Fails on HIGH/CRITICAL CVEs<br/>with a known fix available"]
+
+    sca --> report[/"OWASP HTML Report<br/>Artifact · 30 days"/]
 ```
 
 ### 4.2 Job 1: Build and Test
