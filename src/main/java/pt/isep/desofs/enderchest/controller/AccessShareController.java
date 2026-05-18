@@ -16,13 +16,15 @@ import org.springframework.lang.NonNull;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import pt.isep.desofs.enderchest.entity.AccessShare;
-import pt.isep.desofs.enderchest.repository.AccessShareRepository;
+import pt.isep.desofs.enderchest.exception.resource.AccessShareNotFoundException;
+import pt.isep.desofs.enderchest.exception.resource.DuplicateAccessShareException;
+import pt.isep.desofs.enderchest.service.AccessShareService;
 import pt.isep.desofs.enderchest.service.dto.AccessShareDeleteResponse;
 import pt.isep.desofs.enderchest.service.dto.AccessShareRequest;
 import pt.isep.desofs.enderchest.service.dto.AccessShareResponse;
 
 import java.time.LocalDateTime;
-import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -31,6 +33,11 @@ import java.util.UUID;
  * Handles file and folder sharing endpoints within the EnderChest collaborative
  * storage system. Implements fine-grained access control with role-based permissions
  * (OWNER, EDITOR, VIEWER).
+ *
+ * This controller serves as a thin HTTP layer only:
+ * - Extracts @RequestBody/@PathVariable
+ * - Calls AccessShareService for all business logic
+ * - Builds HTTP responses
  *
  * Endpoints:
  * - POST /api/v1/shares - Create a new access share
@@ -43,13 +50,8 @@ import java.util.UUID;
  * - Caller must be the resource owner to grant/revoke access
  * - Role types validated during share creation
  *
- * Performance:
- * - Share creation: O(1) direct insert with unique constraint check
- * - Share deletion: O(1) direct deletion
- * - Share lookup: O(log n) indexed query
- *
  * @author Backend Architecture
- * @version 1.0
+ * @version 1.1
  */
 @Slf4j
 @RestController
@@ -59,13 +61,10 @@ import java.util.UUID;
 @SecurityRequirement(name = "bearer-jwt")
 public class AccessShareController {
 
-    private final AccessShareRepository accessShareRepository;
+    private final AccessShareService accessShareService;
 
     /**
      * Create a new access share.
-     *
-     * Grants access to a file or folder to another user with a specific role.
-     * Creates an AccessShare record in the database for access control enforcement.
      *
      * HTTP Status:
      * - 201 Created: Access share created successfully
@@ -99,46 +98,26 @@ public class AccessShareController {
         try {
             // Parse resource type
             AccessShare.ResourceType resourceType = AccessShare.ResourceType.valueOf(request.getResourceType());
-
             // Parse role type
             AccessShare.RoleType roleType = AccessShare.RoleType.valueOf(request.getRoleType());
 
-            // Check for existing share (prevent duplicates)
-            Optional<AccessShare> existingShare = accessShareRepository.findByResourceIdAndResourceTypeAndGrantedToUserId(
-                    request.getResourceId(),
-                    resourceType,
-                    request.getGrantedToUserId()
-            );
-
-            if (existingShare.isPresent()) {
-                log.warn("Access share already exists for resource: {}, grantee: {}",
-                        request.getResourceId(), request.getGrantedToUserId());
-                return ResponseEntity.status(HttpStatus.CONFLICT).build();
-            }
-
-            // Create new access share
-            AccessShare accessShare = new AccessShare(
+            // Call service to create access share
+            AccessShare accessShare = accessShareService.createAccessShare(
                     request.getResourceId(),
                     resourceType,
                     request.getGrantedToUserId(),
                     roleType
             );
 
-            // Save to database
-            AccessShare savedShare = accessShareRepository.save(accessShare);
-
-            log.info("Access share created successfully. ShareId: {}, ResourceId: {}, RoleType: {}",
-                    savedShare.getShareId(), savedShare.getResourceId(), savedShare.getRoleType());
-
             // Build response
             AccessShareResponse response = new AccessShareResponse(
-                    savedShare.getShareId(),
-                    savedShare.getResourceId(),
-                    savedShare.getResourceType().toString(),
-                    savedShare.getGrantedToUserId(),
-                    savedShare.getRoleType().toString(),
-                    savedShare.getCreatedAt(),
-                    null // revokedAt is null for new share
+                    accessShare.getShareId(),
+                    accessShare.getResourceId(),
+                    accessShare.getResourceType().toString(),
+                    accessShare.getGrantedToUserId(),
+                    accessShare.getRoleType().toString(),
+                    accessShare.getCreatedAt(),
+                    null
             );
 
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -146,14 +125,14 @@ public class AccessShareController {
         } catch (IllegalArgumentException e) {
             log.warn("Invalid resource type or role type: {} / {}", request.getResourceType(), request.getRoleType(), e);
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+        } catch (DuplicateAccessShareException e) {
+            log.warn("Access share already exists: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
         }
     }
 
     /**
      * Revoke an access share.
-     *
-     * Deletes an AccessShare record to remove granted access to a file or folder.
-     * This is a hard delete operation (not soft delete) as shares are not audit-sensitive.
      *
      * HTTP Status:
      * - 200 OK: Access share revoked successfully
@@ -181,46 +160,30 @@ public class AccessShareController {
 
         log.info("Access share revocation initiated by user: {} for shareId: {}", userId, shareId);
 
-        // Retrieve share from database
+        try {
+            // Call service to revoke access share
+            accessShareService.revokeAccessShare(shareId);
 
-        Optional<AccessShare> shareOptional = accessShareRepository.findById(shareId);
+            // Record revocation timestamp
+            LocalDateTime revokedAt = LocalDateTime.now();
 
-        if (shareOptional.isEmpty()) {
-            log.warn("Access share not found for revocation. ShareId: {}", shareId);
+            // Build response
+            AccessShareDeleteResponse response = new AccessShareDeleteResponse(
+                    shareId,
+                    revokedAt,
+                    "Access share revoked successfully"
+            );
+
+            return ResponseEntity.ok(response);
+
+        } catch (AccessShareNotFoundException e) {
+            log.warn("Access share not found: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
-
-        AccessShare share = shareOptional.get();
-
-        // Record revocation timestamp before deletion
-        LocalDateTime revokedAt = LocalDateTime.now();
-
-        if (revokedAt.isBefore(share.getCreatedAt())) {
-            log.warn("Revocation timestamp is before share creation time. ShareId: {}, CreatedAt: {}, RevokedAt: {}",
-                    shareId, share.getCreatedAt(), revokedAt);
-            revokedAt = share.getCreatedAt().plusSeconds(1); // Ensure revokedAt is after createdAt
-        }
-
-        // Delete the share record
-        accessShareRepository.delete(share);
-
-        log.info("Access share revoked successfully. ShareId: {}, ResourceId: {}, RevokedAt: {}",
-                shareId, share.getResourceId(), revokedAt);
-
-        AccessShareDeleteResponse response = new AccessShareDeleteResponse(
-                shareId,
-                revokedAt,
-                "Access share revoked successfully"
-        );
-
-        return ResponseEntity.ok(response);
     }
 
     /**
      * List access shares for a resource.
-     *
-     * Returns all users who have access to a specific resource (file or folder).
-     * Useful for viewing and managing shared access permissions.
      *
      * HTTP Status:
      * - 200 OK: Shares retrieved successfully (may be empty list)
@@ -256,10 +219,10 @@ public class AccessShareController {
         try {
             AccessShare.ResourceType type = AccessShare.ResourceType.valueOf(resourceType);
 
-            var shares = accessShareRepository.findByResourceIdAndResourceType(resourceId, type);
+            // Call service to list shares
+            List<AccessShare> shares = accessShareService.listAccessSharesByResourceId(resourceId, type);
 
-            log.info("Found {} access shares for resource: {}", shares.size(), resourceId);
-
+            // Build response
             var responses = shares.stream()
                     .map(share -> new AccessShareResponse(
                             share.getShareId(),
@@ -282,8 +245,6 @@ public class AccessShareController {
 
     /**
      * Get a specific access share.
-     *
-     * Retrieves detailed information about a single access share.
      *
      * HTTP Status:
      * - 200 OK: Access share retrieved successfully
@@ -311,27 +272,26 @@ public class AccessShareController {
 
         log.info("Access share retrieval initiated by user: {} for shareId: {}", userId, shareId);
 
-        Optional<AccessShare> shareOptional = accessShareRepository.findById(shareId);
+        try {
+            // Call service to get access share
+            AccessShare share = accessShareService.getAccessShareById(shareId);
 
-        if (shareOptional.isEmpty()) {
-            log.warn("Access share not found. ShareId: {}", shareId);
+            // Build response
+            AccessShareResponse response = new AccessShareResponse(
+                    share.getShareId(),
+                    share.getResourceId(),
+                    share.getResourceType().toString(),
+                    share.getGrantedToUserId(),
+                    share.getRoleType().toString(),
+                    share.getCreatedAt(),
+                    null
+            );
+
+            return ResponseEntity.ok(response);
+
+        } catch (AccessShareNotFoundException e) {
+            log.warn("Access share not found: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
-
-        AccessShare share = shareOptional.get();
-
-        log.info("Access share retrieved successfully. ShareId: {}, ResourceId: {}", shareId, share.getResourceId());
-
-        AccessShareResponse response = new AccessShareResponse(
-                share.getShareId(),
-                share.getResourceId(),
-                share.getResourceType().toString(),
-                share.getGrantedToUserId(),
-                share.getRoleType().toString(),
-                share.getCreatedAt(),
-                null
-        );
-
-        return ResponseEntity.ok(response);
     }
 }

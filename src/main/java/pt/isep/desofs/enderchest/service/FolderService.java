@@ -7,7 +7,9 @@ import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pt.isep.desofs.enderchest.entity.Folder;
+import pt.isep.desofs.enderchest.exception.resource.CircularReferenceFolderException;
 import pt.isep.desofs.enderchest.exception.resource.FolderNotFoundException;
+import pt.isep.desofs.enderchest.exception.resource.InvalidFolderNameException;
 import pt.isep.desofs.enderchest.repository.FolderRepository;
 
 import java.util.List;
@@ -231,11 +233,7 @@ public class FolderService {
      * Sets isDeleted=true and records the deletion timestamp for audit trail.
      * The folder remains in the database for compliance and audit purposes.
      *
-     * Optionally cascades the soft-delete to all child folders in the hierarchy
-     * to maintain folder tree integrity. If cascade is false, child folders remain
-     * active but may become orphaned.
-     *
-     * Performance: O(log n) for single folder, O(log n + c) for cascade where c = child count
+     * Performance: O(log n) for single folder
      * Transaction: Atomic operation with audit trail
      *
      * @param folderId The UUID of the folder to soft-delete
@@ -246,7 +244,7 @@ public class FolderService {
      *   // Folder now has isDeleted=true, deletedAt=now, but remains in DB
      */
     @Transactional
-    public void softDeleteFolder(UUID folderId) {
+    public void softDeleteFolder(UUID folderId) throws FolderNotFoundException {
         // Retrieve folder
         Folder folder = getFolderByIdOrThrow(folderId);
 
@@ -415,16 +413,17 @@ public class FolderService {
      *
      * @param folderId The UUID of the folder to rename
      * @param newFolderName The new name for the folder (must not be blank)
+     * @return The renamed Folder entity
      * @throws FolderNotFoundException if folder doesn't exist or is deleted
-     * @throws IllegalArgumentException if newFolderName is null or blank
+     * @throws InvalidFolderNameException if newFolderName is null or blank
      *
      * Example:
      *   folderService.renameFolder(folderId, "New Folder Name");
      */
     @Transactional
-    public Folder renameFolder(UUID folderId, String newFolderName) {
+    public Folder renameFolder(UUID folderId, String newFolderName) throws FolderNotFoundException, InvalidFolderNameException {
         if (newFolderName == null || newFolderName.isBlank()) {
-            throw new IllegalArgumentException("New folder name must not be null or blank");
+            throw new InvalidFolderNameException("New folder name must not be null or blank");
         }
 
         Folder folder = getFolderByIdOrThrow(folderId);
@@ -454,8 +453,9 @@ public class FolderService {
      *
      * @param folderId The UUID of the folder to move
      * @param newParentFolderId The UUID of the new parent folder (null for root level)
+     * @return The moved Folder entity
      * @throws FolderNotFoundException if folder or new parent doesn't exist or is deleted
-     * @throws IllegalArgumentException if attempting to create circular reference
+     * @throws CircularReferenceFolderException if attempting to create circular reference
      *
      * Example:
      *   // Move folder to new parent
@@ -465,12 +465,12 @@ public class FolderService {
      *   folderService.moveFolder(folderId, null);
      */
     @Transactional
-    public Folder moveFolder(UUID folderId, UUID newParentFolderId) {
+    public Folder moveFolder(UUID folderId, UUID newParentFolderId) throws FolderNotFoundException, CircularReferenceFolderException {
         Folder folder = getFolderByIdOrThrow(folderId);
 
         // Prevent moving to self
         if (folderId.equals(newParentFolderId)) {
-            throw new IllegalArgumentException("Cannot move a folder to itself");
+            throw new CircularReferenceFolderException(folderId, newParentFolderId);
         }
 
         // If new parent is specified, verify it exists and is not deleted
@@ -479,9 +479,7 @@ public class FolderService {
 
             // Prevent circular references: check if new parent is a descendant of this folder
             if (isDescendantOf(newParentFolderId, folderId)) {
-                throw new IllegalArgumentException(
-                    "Cannot move a folder to one of its descendants (would create circular reference)"
-                );
+                throw new CircularReferenceFolderException(folderId, newParentFolderId);
             }
         }
 
