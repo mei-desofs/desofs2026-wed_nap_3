@@ -281,16 +281,21 @@ JaCoCo instruction coverage from a full local build including all 4 test classes
 
 **File:** `.github/workflows/ci.yml`
 
-The pipeline consists of three jobs triggered on every push to `main` and every pull request:
+The pipeline consists of four jobs triggered on every push to `main` and every pull request. Jobs 2–4 run in parallel after Job 1 passes:
 
 ```
-┌─────────────────┐      ┌──────────────────────┐      ┌─────────────────────┐
-│ build-and-test  │─────▶│ sca                  │      │ sonar               │
-│ (compile + test)│      │ (Dependency-Check)   │      │ (SonarCloud SAST)   │
-└─────────────────┘      └──────────────────────┘      └─────────────────────┘
-        │                                                        ▲
-        └────────────────────────────────────────────────────────┘
-                         needs: build-and-test
+                          ┌──────────────────────────┐
+                     ┌───▶│ Job 2: SCA               │
+                     │    │ OWASP Dependency-Check   │
+┌──────────────────┐ │    └──────────────────────────┘
+│ Job 1:           │─┤    ┌──────────────────────────┐
+│ Build & Test     │ ├───▶│ Job 3: SAST              │
+│ mvn clean install│ │    │ SonarCloud               │
+└──────────────────┘ │    └──────────────────────────┘
+                     │    ┌──────────────────────────┐
+                     └───▶│ Job 4: Container Scan    │
+                          │ Trivy                    │
+                          └──────────────────────────┘
 ```
 
 ### 4.2 Job 1: Build and Test
@@ -307,6 +312,7 @@ steps:
 - Executes all 53 automated tests
 - Fails the pipeline on any test failure
 - Uses `application-test.properties` with H2 in-memory database
+- JWK set URI overridden with a placeholder — tests using `@WithMockUser` never contact Auth0
 
 ### 4.3 Job 2: SCA — OWASP Dependency-Check
 
@@ -315,8 +321,9 @@ needs: build-and-test
 steps:
   - OWASP Dependency-Check Maven plugin (v10.0.4)
   - Quality Gate: Fail if CVSS >= 7.0 (HIGH severity)
-  - Upload report artifact (retention: 30 days)
+  - NVD API key (GitHub secret) removes rate-limiting
   - NVD cache: weekly refresh via actions/cache@v4
+  - Upload report artifact (retention: 30 days, uploaded even on failure)
 ```
 
 **Configuration (pom.xml):**
@@ -328,28 +335,62 @@ steps:
 </configuration>
 ```
 
+**Suppression policy:** Dependencies with known CVEs that cannot be upgraded (managed by Spring Boot BOM) are suppressed in `owasp-suppressions.xml` with a written justification, reviewer name, and annual review obligation.
+
 ### 4.4 Job 3: SAST — SonarCloud
 
 ```yaml
 needs: build-and-test
 steps:
+  - Checkout with full history (fetch-depth: 0)
   - Build with coverage: mvn -B verify sonar:sonar
   - Project: mei-desofs-wed-nap-3_mei-desofs-wed-nap-3-sonarqube
-  - SonarCloud Quality Gate enforcement
 ```
 
-Quality Gate conditions:
-- No new Critical vulnerabilities
-- No new Blocker issues
-- Coverage threshold enforcement
+SonarCloud provides:
+- Static analysis for security vulnerabilities and code smells
+- JaCoCo coverage integration (per-file coverage on the dashboard)
+- Complementary to GitHub's built-in CodeQL (which runs automatically via default code scanning)
 
-### 4.5 Caching Strategy
+**Known limitation:** The SonarCloud default quality gate ("Sonar way") requires ≥ 80% coverage on new code. `-Dsonar.qualitygate.wait=true` is intentionally not set to avoid permanently blocking the pipeline until a custom quality gate with an appropriate threshold is created.
+
+### 4.5 Job 4: Container Scan — Trivy
+
+```yaml
+needs: build-and-test
+steps:
+  - Build Docker image: docker build -t enderchest:${{ github.sha }} .
+  - Trivy scan: severity CRITICAL,HIGH | ignore-unfixed: true | exit-code: 1
+```
+
+Trivy fills a gap that OWASP DC cannot cover: OS-level packages inside the Docker image (`eclipse-temurin:21-jre-alpine` ships Alpine Linux packages such as `musl`, `openssl`, `busybox`). Configuration:
+
+| Setting | Value | Rationale |
+|---------|-------|-----------|
+| `severity` | CRITICAL, HIGH | Matches OWASP DC threshold (CVSS ≥ 7.0) |
+| `ignore-unfixed` | true | Only fails on CVEs with a released fix |
+| `exit-code` | 1 | Fails the pipeline job, blocking merge |
+
+**Resolution when a CVE is found:** Update the base image tag in the `Dockerfile` to a version that includes the fix.
+
+### 4.6 Caching Strategy
 
 | Cache | Key | Purpose |
 |-------|-----|---------|
 | Maven dependencies | `${{ runner.os }}-maven-${{ hashFiles('pom.xml') }}` | Skip dependency download |
-| NVD database | `owasp-nvd-${{ runner.os }}-${{ date +%Y-%U }}` | Weekly vulnerability DB refresh |
+| NVD database | `owasp-nvd-${{ runner.os }}-${{ steps.week.outputs.week }}` | Weekly vulnerability DB refresh |
 | SonarCloud packages | `${{ runner.os }}-sonar` | Faster analysis |
+
+### 4.7 Branch Protection
+
+| Setting | Value |
+|---------|-------|
+| Require pull request before merging | Enabled |
+| Required approving reviews | 1 |
+| Dismiss stale PR approvals on new commits | Enabled |
+| Required status checks | Build & Test, SCA, SAST, Container Scan — Trivy |
+| Require branches to be up to date | Enabled |
+| Do not allow bypassing | Enabled |
 
 ---
 

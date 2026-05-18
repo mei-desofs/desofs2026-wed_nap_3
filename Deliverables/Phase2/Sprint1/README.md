@@ -68,9 +68,12 @@ mvn clean verify -Dspring.profiles.active=test '-Dsurefire.includes=**/*Test.jav
 
 | Job | Purpose | Quality Gate |
 |-----|---------|--------------|
-| build-and-test | Compile + run 53 tests | Any test failure fails the build |
-| sca | OWASP Dependency-Check v10.0.4 | CVSS ≥ 7.0 fails the build |
-| sonar | SonarCloud SAST | Critical vulnerabilities block merge |
+| Build & Test | Compile + run 53 tests | Any test failure fails the build |
+| SCA | OWASP Dependency-Check v10.0.4 | CVSS ≥ 7.0 fails the build |
+| SAST | SonarCloud (code quality + security) | Critical vulnerabilities reported |
+| Container Scan | Trivy (OS-level CVEs in Docker image) | HIGH/CRITICAL with fix available fails the build |
+
+Jobs 2–4 run in parallel after Job 1 passes. See [Pipeline_Decisions.md](../Pipeline_Decisions.md) for full rationale.
 
 ---
 
