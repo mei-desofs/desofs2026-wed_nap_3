@@ -43,7 +43,13 @@ flowchart TD
 
 Jobs 2, 3, and 4 run in parallel after Job 1 passes. This keeps total pipeline time low while ensuring that no security scan runs against code that does not compile or has failing tests.
 
-### 2.2 Trigger Strategy
+    build --> sca
+    build --> sonar
+    build --> trivy
+
+    sca["Job 2 — SCA\nOWASP Dependency-Check\nFails on CVSS ≥ 7.0"]
+    sonar["Job 3 — SAST\nSonarCloud\nCode quality + security rules"]
+    trivy["Job 4 — Container Scan\nTrivy\nFails on HIGH/CRITICAL CVEs\nwith a known fix available"]
 
 The pipeline triggers on every push and every pull request targeting `main`. This enforces all security gates at PR time, before any code reaches the main branch.
 
@@ -151,7 +157,7 @@ One required reviewer was chosen over two because the team has 4 developers on a
 
 ---
 
-## 7. Trade-offs and Known Limitations
+## 8. Trade-offs and Known Limitations
 
 | Item | Trade-off |
 |---|---|
