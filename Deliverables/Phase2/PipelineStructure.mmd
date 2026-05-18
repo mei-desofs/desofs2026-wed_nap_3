@@ -1,0 +1,15 @@
+flowchart TD
+    trigger([Push / Pull Request to main])
+    trigger --> build
+
+    build["Job 1 — Build & Test\nmvn clean install\nH2 in-memory DB · JaCoCo coverage"]
+
+    build --> sca
+    build --> sonar
+    build --> trivy
+
+    sca["Job 2 — SCA\nOWASP Dependency-Check\nFails on CVSS ≥ 7.0"]
+    sonar["Job 3 — SAST\nSonarCloud\nCode quality + security rules"]
+    trivy["Job 4 — Container Scan\nTrivy\nFails on HIGH/CRITICAL CVEs\nwith a known fix available"]
+
+    sca --> report[/"OWASP HTML Report\nArtifact · 30 days"/]
