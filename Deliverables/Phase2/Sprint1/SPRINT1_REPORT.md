@@ -277,6 +277,8 @@ JaCoCo instruction coverage from a full local build including all 4 test classes
 
 ## 4. CI/CD Pipeline
 
+See further details in the [Pipeline Decisions](../Pipeline_Decisions.md) document.
+
 ### 4.1 Architecture
 
 **File:** `.github/workflows/ci.yml`
