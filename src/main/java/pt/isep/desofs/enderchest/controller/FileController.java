@@ -140,12 +140,13 @@ public class FileController {
 
         // Extract userId from JWT subject — never trust client-supplied headers
         String userId = jwt.getSubject();
+        String email = jwt.getClaimAsString("email");
 
         log.info("File download initiated by user: {} for fileId: {}", userId, fileId);
 
         try {
             // Delegate to FileService for access control and file retrieval
-            File file = fileService.downloadFile(fileId, userId);
+            File file = fileService.downloadFile(fileId, userId, email);
 
             // Construct file path and load resource
             Path filePath = Paths.get(file.getStorageLocation());
@@ -208,13 +209,14 @@ public class FileController {
 
         // Extract userId from JWT subject — never trust client-supplied headers
         String userId = jwt.getSubject();
+        String email = jwt.getClaimAsString("email");
 
         log.info("File deletion initiated by user: {} for fileId: {}", userId, fileId);
 
         try {
             // Delegate to FileService for access control and deletion
             // FileService.deleteFile() handles all access checks and performs the soft delete
-            fileService.deleteFile(fileId, userId);
+            fileService.deleteFile(fileId, userId, email);
 
             // Build success response with current timestamp
             FileDeleteResponse response = new FileDeleteResponse(

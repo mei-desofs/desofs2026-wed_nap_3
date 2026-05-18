@@ -1,603 +1,436 @@
-# Phase 2 — Sprint 1: Development and Testing Report
+# Phase 2 — Sprint 1: Development and Security Testing Report
 
 **Course:** DESOFS 2026  
 **Group:** WED_NAP_3  
 **Sprint:** Phase 2 — Sprint 1  
 **Date:** May 2026  
-**Focus:** DevSecOps, CI/CD Pipeline, Code Reviews, SAST, DAST, IAST, SCA, Security Testing
 
 ---
 
-## Executive Summary
+## 1. Introduction
 
-**Sprint 1 of Phase 2** delivered a **production-grade DevSecOps pipeline** with comprehensive security testing, **OAuth2/RBAC authorization**, and **file storage security** with path traversal and file type validation. The team successfully implemented all four developer roles:
+### 1.1 Purpose
 
-- **Developer 1:** CI/CD pipeline with SAST (SonarCloud), SCA (OWASP Dependency-Check), and automated quality gates
-- **Developer 2:** Auth0 integration, JWT validation, RBAC enforcement with `@PreAuthorize`
-- **Developer 3:** File storage security with SHA-256 hashing, magic byte validation, path traversal prevention
-- **Developer 4:** Integration tests for IDOR prevention, API testing with Bruno collection
+This report documents the development, security implementation, and testing activities performed during Sprint 1 of Phase 2. It presents the DevSecOps pipeline configuration, authentication and authorization implementation, file storage security controls, and the automated testing strategy adopted to ensure compliance with the Application Security Verification Standard (ASVS) v4.0.
 
-### Key Achievements
-✅ **Automated CI/CD Pipeline** - Every push/PR triggers build, test, SAST, SCA  
-✅ **OAuth2 + RBAC** - Auth0 integration with role-based access control  
-✅ **File Security** - SHA-256 hashing, magic byte validation, path traversal prevention  
-✅ **Security Tests** - 25+ tests covering authorization, file upload security, IDOR prevention  
-✅ **Code Quality** - SonarCloud integration with quality gates, zero critical vulnerabilities  
-✅ **Bruno API Collection** - Pre-configured with Auth0, ready for manual testing  
+### 1.2 Scope
 
----
+The sprint delivered four primary work streams:
 
-## 1. Organization and Language (5%)
+1. **CI/CD Pipeline** — Automated build, SAST (SonarCloud), and SCA (OWASP Dependency-Check)
+2. **Authentication & Authorization** — Auth0 OAuth2 integration with role-based access control (RBAC)
+3. **File Storage Security** — SHA-256 integrity hashing, magic byte validation, path traversal prevention
+4. **Security Testing** — Automated unit and integration tests targeting OWASP Top 10 vulnerabilities
 
-### 1.1 Document Structure
+### 1.3 Repository Structure
 
-This report is organized as follows:
-
-1. **Executive Summary** - High-level overview of accomplishments
-2. **Development** - Code changes, best practices, security audits
-3. **Build and Test** - Test inventory, test results, dynamic analysis
-4. **Pipeline Automation** - CI/CD workflow, automated quality gates
-5. **ASVS Traceability** - Security requirements to test mapping
-6. **Appendices** - Evidence links, test screenshots
-
-**Repository Structure:**
 ```
 enderchest/
-├── .github/workflows/ci.yml          ← CI/CD Pipeline (SAST, SCA, Build)
-├── src/main/java/
-│   ├── config/SecurityConfig.java    ← Auth0 + RBAC config
-│   └── controller/FileController.java ← @PreAuthorize annotations
-├── src/test/java/
-│   ├── controller/FileControllerAuthTest.java    ← RBAC tests (ST-07)
-│   ├── controller/FileAccessControlIT.java       ← IDOR tests (ST-02)
-│   └── integration/FileUploadSecurityIT.java     ← File security tests (ST-01, ST-03)
-├── pom.xml                           ← Maven with SCA plugin
-├── bruno/collection/                 ← API testing collection
-└── Deliverables/Phase2/Sprint1/      ← This report
+├── .github/workflows/ci.yml              # CI/CD Pipeline (3 jobs)
+├── src/main/java/pt/isep/desofs/enderchest/
+│   ├── config/SecurityConfig.java        # OAuth2 + RBAC configuration
+│   ├── config/ApiExceptionHandler.java   # Global exception handling
+│   ├── controller/FileController.java    # REST API with @PreAuthorize
+│   ├── entity/                           # JPA entities (File, User, AccessShare, Folder)
+│   ├── service/FileStorageService.java   # File operations with security controls
+│   └── service/FileService.java          # Access control (IDOR prevention)
+├── src/test/java/pt/isep/desofs/enderchest/
+│   ├── controller/FileControllerAuthTest.java  # RBAC tests (ST-07)
+│   ├── controller/FileAccessControlIT.java     # IDOR tests (ST-02)
+│   ├── integration/FileUploadSecurityIT.java   # File security tests (ST-01, ST-03–ST-06)
+│   └── service/FileStorageServiceTest.java     # Unit tests (upload, dedup, delete)
+├── bruno/collection/                     # API testing collection (21 requests)
+├── pom.xml                               # Maven build with SCA + JaCoCo plugins
+└── Deliverables/Phase2/Sprint1/          # This report
 ```
 
-### 1.2 Language Quality
+### 1.4 Codebase Metrics
 
-All code, documentation, and commit messages follow professional standards:
-- Clear variable and method names (`JwtAuthenticationConverter`, `validateFilePath`)
-- Comprehensive JavaDoc on security-critical methods
-- Meaningful commit messages with security context
-- No grammar/spelling errors in documentation
+| Metric | Value |
+|--------|-------|
+| Java source files | 55 |
+| Lines of code (src/main) | 7,431 |
+| Test classes | 4 |
+| Total test methods | 53 |
 
 ---
 
-## 2. Development (30%)
+## 2. Development
 
-### 2.1 Security Requirements Implemented
+### 2.1 Authentication and Authorization (OAuth2 + RBAC)
 
-| Req ID | Requirement | Status | Evidence |
-|--------|-------------|--------|----------|
-| SDR-01 | JWT authentication with 15-min expiry | ✅ | Auth0 API configured with 900s token lifetime |
-| SDR-02 | RBAC verified before every operation | ✅ | `@PreAuthorize` on all endpoints; FileControllerAuthTest.java |
-| SDR-NEW-01 | JWT algorithm whitelist (reject `alg: none`) | ✅ | Auth0 RS256; Spring Security validates algorithm |
-| SDR-NEW-11 | SHA-256 file integrity hash | ✅ | FileStorageService.java; FileUploadSecurityIT.java |
-| ST-01 | Path traversal prevention test | ✅ | FileUploadSecurityIT.java (lines 280-320) |
-| ST-02 | IDOR prevention test | ✅ | FileAccessControlIT.java (10 test cases) |
-| ST-03 | File type validation test | ✅ | FileUploadSecurityIT.java (lines 350-400) |
-| ST-07 | RBAC enforcement test | ✅ | FileControllerAuthTest.java (10 test cases) |
-| T-09 | Role abuse prevention (EDITOR cannot DELETE) | ✅ | FileControllerAuthTest.java line 180 |
-| T-10 | Admin endpoint protection | ✅ | FileController.java `/admin/health`; test ST-07-01 |
+#### 2.1.1 Security Configuration
 
-### 2.2 Code Changes Overview
+**File:** `src/main/java/pt/isep/desofs/enderchest/config/SecurityConfig.java`
 
-#### 2.2.1 OAuth2 & RBAC Integration
-
-**File:** `src/main/java/pt/isep/desofs/enderchest/config/SecurityConfig.java`  
-**Changes:** Created custom `JwtAuthenticationConverter` to extract Auth0 roles from custom claim
+The application uses Spring Security's OAuth2 Resource Server with Auth0 as the identity provider. A custom `JwtAuthenticationConverter` extracts roles from the Auth0 custom claim namespace and maps them to Spring Security `GrantedAuthority` objects:
 
 ```java
+private static final String ROLES_CLAIM = "https://enderchest-api/roles";
+
 converter.setJwtGrantedAuthoritiesConverter(jwt -> {
-    List<String> roles = jwt.getClaimAsStringList("https://enderchest-api/roles");
+    List<String> roles = jwt.getClaimAsStringList(ROLES_CLAIM);
+    if (roles == null || roles.isEmpty()) {
+        return Collections.emptyList();
+    }
     return roles.stream()
-        .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
-        .collect(Collectors.toList());
+            .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
+            .collect(Collectors.toList());
 });
 ```
 
-**Impact:** Converts Auth0 roles to Spring Security `GrantedAuthority` objects for `@PreAuthorize` annotations.
+Security properties enforced:
+- **Stateless sessions** — `SessionCreationPolicy.STATELESS` (no HTTP sessions)
+- **CSRF disabled** — appropriate for a stateless API that does not use cookies
+- **All endpoints authenticated** — except Swagger UI documentation paths
+- **Method-level security** — `@EnableMethodSecurity(prePostEnabled = true)`
 
----
+#### 2.1.2 RBAC Enforcement
 
-**File:** `src/main/java/pt/isep/desofs/enderchest/controller/FileController.java`  
-**Changes:** Added `@PreAuthorize` annotations to enforce RBAC
+**File:** `src/main/java/pt/isep/desofs/enderchest/controller/FileController.java`
 
-| Endpoint | Before | After | Threat Mitigated |
-|----------|--------|-------|------------------|
-| `POST /upload` | No auth | `@PreAuthorize("hasAnyRole('OWNER','EDITOR')")` | T-09 (VIEWER cannot upload) |
-| `DELETE /{id}` | No auth | `@PreAuthorize("hasRole('OWNER')")` | T-09 (EDITOR cannot delete) |
-| `GET /admin/health` | New endpoint | `@PreAuthorize("hasRole('ADMIN')")` | T-10 (Admin-only protection) |
+Each endpoint is protected with `@PreAuthorize` annotations enforcing the principle of least privilege:
 
-**Security improvement — userId from JWT:**
-```java
-// Before (insecure):
-@RequestHeader(value = "X-User-Id") String userId
+| Endpoint | Allowed Roles | Threat Mitigated |
+|----------|---------------|------------------|
+| `POST /api/v1/files/upload` | OWNER, EDITOR | T-09: VIEWER cannot upload |
+| `GET /api/v1/files/{fileId}` | OWNER, EDITOR, VIEWER | SDR-02: Read access |
+| `DELETE /api/v1/files/{fileId}` | OWNER | T-09: EDITOR cannot delete |
+| `GET /api/v1/files/admin/health` | ADMIN | T-10: Admin-only endpoint |
 
-// After (secure):
-@AuthenticationPrincipal Jwt jwt
-String userId = jwt.getSubject(); // "auth0|6a05a12ff53eb09287768800"
-```
+#### 2.1.3 User Identity Extraction
 
-Prevents header forgery attacks where clients could impersonate other users.
-
----
-
-#### 2.2.2 File Storage Security
-
-**File:** `src/main/java/pt/isep/desofs/enderchest/service/FileStorageService.java`  
-**Changes:** Implemented SHA-256 hashing and magic byte validation
+User identity is derived exclusively from the JWT `sub` (subject) claim, preventing header forgery attacks:
 
 ```java
-// SHA-256 hash calculation
-String fileHash = calculateSHA256Hash(storedFile);
-// Magic byte validation (not extension-based)
-validateMagicBytes(uploadedFile, allowedMimeTypes);
-// Path traversal prevention via UUID-based filenames
-String safeFilename = UUID.randomUUID().toString();
+// Secure: identity from cryptographically signed JWT
+String userId = jwt.getSubject(); // e.g., "auth0|6a05a12ff53eb09287768800"
 ```
 
-**Impact:** Prevents three critical threats:
-1. **File integrity** - SHA-256 allows verification that downloaded file wasn't modified
-2. **File type bypass** - Magic bytes validate true file type, not spoofed extensions
-3. **Path traversal** - UUID-based names prevent directory traversal attacks
+This replaces a prior insecure pattern where the userId was extracted from a client-supplied `X-User-Id` header.
+
+### 2.2 File Storage Security
+
+**File:** `src/main/java/pt/isep/desofs/enderchest/service/FileStorageService.java`
+
+#### 2.2.1 SHA-256 Integrity Hashing
+
+Every uploaded file receives a SHA-256 hash computed from its byte content. This hash is persisted alongside the file metadata, enabling integrity verification on download.
+
+#### 2.2.2 Magic Byte Validation
+
+File type validation is performed using magic byte (file signature) analysis rather than extension-based detection. This prevents bypasses where an attacker renames an executable to `.pdf`.
+
+Blocked file types: `.exe`, `.bat`, `.sh`, `.jar`, `.com`, `.cmd`, `.msi`
+
+#### 2.2.3 Path Traversal Prevention
+
+Filenames are sanitised to prevent directory traversal attacks. The system rejects filenames containing `../`, `..\\`, absolute paths (`/`, `C:\`), and stores files using UUID-based names that cannot be controlled by the client.
+
+#### 2.2.4 Deduplication
+
+Files are deduplicated by SHA-256 hash. If a file with an identical hash already exists (including soft-deleted files), the system returns a reference to the existing file rather than storing a duplicate.
+
+#### 2.2.5 Storage Quota Enforcement
+
+Per-user storage quotas are enforced before file persistence, preventing resource exhaustion attacks.
+
+### 2.3 Access Control (IDOR Prevention)
+
+**File:** `src/main/java/pt/isep/desofs/enderchest/service/FileService.java`
+
+Object-level authorization prevents Insecure Direct Object Reference (IDOR) attacks through two verification layers:
+
+1. **Ownership check:** `file.getUploadedBy().equals(userId)` — the file uploader always has access
+2. **AccessShare check:** queries the `access_shares` table for explicit grants (OWNER, EDITOR, VIEWER roles at the object level)
+
+### 2.4 Global Exception Handling
+
+**File:** `src/main/java/pt/isep/desofs/enderchest/config/ApiExceptionHandler.java`
+
+A `@ControllerAdvice` class ensures that:
+- `FileNotFoundException` returns HTTP 404
+- `FileAccessDeniedException` returns HTTP 403
+- `AccessDeniedException` (Spring Security) is re-thrown for proper 403 handling
+- `InvalidFileTypeException` returns HTTP 415
+- `PathTraversalAttemptException` returns HTTP 400
+- `StorageQuotaExceededException` returns HTTP 413
+- Generic exceptions return HTTP 500 without leaking internal details
 
 ---
 
-#### 2.2.3 Global Exception Handling
-
-**File:** `src/main/java/pt/isep/desofs/enderchest/config/ApiExceptionHandler.java`  
-**Changes:** Allow Spring Security to handle `AccessDeniedException` correctly
-
-```java
-@ExceptionHandler(Exception.class)
-public ResponseEntity<?> handleGenericException(Exception ex) throws Exception {
-    if (ex instanceof AccessDeniedException) {
-        throw ex; // Let Spring Security return 403 Forbidden
-    }
-    return ResponseEntity.status(500).body(error);
-}
-```
-
-**Impact:** Ensures 403 Forbidden responses are returned on authorization failures, not 500 Internal Server Error.
-
----
-
-### 2.3 Development Best Practices
-
-#### 2.3.1 Code Reviews
-- All commits include descriptive messages with security context
-- Pair review process enforced via GitHub branch protection rules
-- Each PR requires at least 1 approval before merge
-- Code review checklist includes security validation (OWASP Top 10, ASVS)
-
-#### 2.3.2 Security Audit Trail
-- `SecurityAuditLogger` logs all authentication/authorization events
-- Each file upload logs: user, filename, file type, path validation result
-- Each deletion logs: user, file owner, authorization result
-
-#### 2.3.3 Static Code Analysis (SAST)
-- **SonarCloud integration** in CI/CD pipeline
-- Quality Gate blocks PRs with new critical vulnerabilities
-- Project configured with project key: `mei-desofs-wed-nap-3_mei-desofs-wed-nap-3-sonarqube`
-
-#### 2.3.4 Dependency Management (SCA)
-- **OWASP Dependency-Check** in CI/CD pipeline
-- Fails build if any dependency has CVSS ≥ 7.0 (HIGH severity)
-- Weekly NVD database cache for faster scans
-- All dependencies tracked in pom.xml with version pins
-
----
-
-## 3. Build and Test (30%)
+## 3. Build and Test
 
 ### 3.1 Test Inventory
 
-| Test Class | Test Count | Test Type | Coverage |
-|------------|-----------|-----------|----------|
-| `FileControllerAuthTest.java` | 10 | Unit (Spring Security Test) | RBAC enforcement (ST-07) |
-| `FileAccessControlIT.java` | 10 | Integration | IDOR prevention (ST-02) |
-| `FileUploadSecurityIT.java` | 16 | Integration | Path traversal (ST-01), File type (ST-03), SHA-256 |
-| `FileStorageServiceTest.java` | 8 | Unit | File service logic |
-| **Total** | **44** | | |
+| Test Class | Tests | Type | Focus Area |
+|------------|-------|------|------------|
+| `FileControllerAuthTest` | 10 | Unit (MockMvc + @WithMockUser) | RBAC enforcement (ST-07) |
+| `FileAccessControlIT` | 11 | Integration (SpringBootTest + jwt()) | IDOR prevention (ST-02) |
+| `FileUploadSecurityIT` | 17 | Integration (SpringBootTest) | Path traversal, file type, hashing (ST-01, ST-03–ST-06) |
+| `FileStorageServiceTest` | 16 | Unit (Mockito) | Service-layer logic |
+| **Total** | **53** | | |
 
-### 3.2 Test Results
+### 3.2 Test Results — RBAC Enforcement (ST-07)
 
-#### 3.2.1 Unit Tests
+**Class:** `FileControllerAuthTest.java` — 10 tests, 0 failures
 
-```
-[INFO] Running pt.isep.desofs.enderchest.controller.FileControllerAuthTest
-[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.1 s
-[INFO] BUILD SUCCESS
-```
+| ID | Test Case | Expected | Result |
+|----|-----------|----------|--------|
+| ST-07-01 | ADMIN accesses `/admin/health` | 200 OK | Pass |
+| ST-07-02 | OWNER accesses `/admin/health` | 403 Forbidden | Pass |
+| ST-07-03 | EDITOR accesses `/admin/health` | 403 Forbidden | Pass |
+| ST-07-04 | VIEWER accesses `/admin/health` | 403 Forbidden | Pass |
+| ST-07-05 | Unauthenticated access | 401 Unauthorized | Pass |
+| ST-07-06 | EDITOR attempts file deletion | 403 Forbidden | Pass |
+| ST-07-07 | VIEWER attempts file deletion | 403 Forbidden | Pass |
+| ST-07-08 | Unauthenticated file deletion | 401 Unauthorized | Pass |
+| ST-07-09 | Unauthenticated file download | 401 Unauthorized | Pass |
+| ST-07-10 | ADMIN attempts file deletion | 403 Forbidden | Pass |
 
-**Test Cases (ST-07):**
-- ✅ ST-07-01: ADMIN role can access `/admin/health` → 200 OK
-- ✅ ST-07-02: OWNER cannot access `/admin/health` → 403 Forbidden
-- ✅ ST-07-03: EDITOR cannot access `/admin/health` → 403 Forbidden
-- ✅ ST-07-04: VIEWER cannot access `/admin/health` → 403 Forbidden
-- ✅ ST-07-05: Unauthenticated access rejected → 401 Unauthorized
-- ✅ ST-07-06: ADMIN cannot delete user files → 403 Forbidden
-- ✅ ST-07-07: EDITOR cannot delete files → 403 Forbidden
-- ✅ ST-07-08: VIEWER cannot delete files → 403 Forbidden
-- ✅ ST-07-09: Unauthenticated download rejected → 401 Unauthorized
-- ✅ ST-07-10: ADMIN cannot access restricted file endpoints → 403 Forbidden
+### 3.3 Test Results — IDOR Prevention (ST-02)
 
----
+**Class:** `FileAccessControlIT.java` — 11 tests, 0 failures
 
-#### 3.2.2 Integration Tests
+| ID | Test Case | Expected | Result |
+|----|-----------|----------|--------|
+| ST-02-01 | User B downloads User A's file (no AccessShare) | 403 Forbidden | Pass |
+| ST-02-02 | User A downloads own file (uploader check) | 404 (IDOR passed, no file on disk) | Pass |
+| ST-02-03 | User B with VIEWER AccessShare downloads | 404 (IDOR passed) | Pass |
+| ST-02-04 | User B with EDITOR AccessShare downloads | 404 (IDOR passed) | Pass |
+| ST-02-05 | User B deletes User A's file (no AccessShare) | 403 Forbidden | Pass |
+| ST-02-06 | User A deletes own file | 200 OK | Pass |
+| ST-02-07 | User B with VIEWER AccessShare deletes | 403 Forbidden | Pass |
+| ST-02-08 | User B with EDITOR AccessShare deletes | 403 Forbidden | Pass |
+| ST-02-09 | User B with OWNER AccessShare deletes | 200 OK | Pass |
+| ST-02-10 | Unauthenticated download | 401 Unauthorized | Pass |
+| ST-02-11 | Unauthenticated delete | 401 Unauthorized | Pass |
 
-```
-[INFO] Running pt.isep.desofs.enderchest.controller.FileAccessControlIT
-[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 5.2 s
-[INFO] BUILD SUCCESS
-```
+### 3.4 Test Results — File Upload Security (ST-01, ST-03–ST-06)
 
-**IDOR Tests (ST-02):**
-- ✅ User A uploads file → fileId stored
-- ✅ User B attempts download without AccessShare → 403 Forbidden
-- ✅ User B attempts delete without AccessShare → 403 Forbidden
-- ✅ User A can download own file → 200 OK
-- ✅ User A can delete own file → 204 No Content
+**Class:** `FileUploadSecurityIT.java` — 16 tests, 0 failures
 
----
+| ID | Test Case | Expected | Result |
+|----|-----------|----------|--------|
+| ST-01-A | Path traversal with `../` | PathTraversalAttemptException | Pass |
+| ST-01-B | Path traversal with `/` | PathTraversalAttemptException | Pass |
+| ST-01-C | Windows absolute path | PathTraversalAttemptException | Pass |
+| ST-01-D | Backslash traversal | PathTraversalAttemptException | Pass |
+| ST-01-E | Valid filename upload | 201 Created | Pass |
+| ST-03-A | Executable file (.exe) | InvalidFileTypeException | Pass |
+| ST-03-B | Batch script (.bat) | InvalidFileTypeException | Pass |
+| ST-03-C | Shell script (.sh) | InvalidFileTypeException | Pass |
+| ST-03-D | JAR file (.jar) | InvalidFileTypeException | Pass |
+| ST-03-E | Valid PDF file | 201 Created | Pass |
+| ST-03-F | Valid JPEG image | 201 Created | Pass |
+| ST-04-A | Duplicate file upload (deduplication) | Returns existing file ID | Pass |
+| ST-05-A | Soft delete file | File marked as deleted | Pass |
+| ST-05-B | Retrieve soft-deleted file | Failure (file not accessible) | Pass |
+| ST-06-A | SHA-256 hash validity | Valid 64-char hex string | Pass |
+| ST-06-B | Hash persistence in database | Hash stored correctly | Pass |
 
-```
-[INFO] Running pt.isep.desofs.enderchest.integration.FileUploadSecurityIT
-[INFO] Tests run: 16, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 12.4 s
-[INFO] BUILD SUCCESS
-```
+### 3.5 Test Results — Service Unit Tests
 
-**File Security Tests:**
+**Class:** `FileStorageServiceTest.java` — 16 tests, 0 failures
 
-**Path Traversal (ST-01):**
-- ✅ Filename `../../../etc/passwd` rejected → 400 Bad Request
-- ✅ Filename `..\\..\\windows\\system32` rejected → 400 Bad Request
-- ✅ Absolute path `/tmp/malicious.pdf` rejected → 400 Bad Request
-- ✅ Valid filename `document.pdf` accepted → 201 Created
+| ID | Test Case | Result |
+|----|-----------|--------|
+| 1 | Upload valid file with SHA-256 hash | Pass |
+| 2 | Path traversal detection (..) | Pass |
+| 3 | Path traversal detection (/) | Pass |
+| 4 | Invalid MIME type rejection (T-06) | Pass |
+| 5 | File size limit enforcement | Pass |
+| 6 | Null filename rejection | Pass |
+| 7 | Empty filename rejection | Pass |
+| 8 | Duplicate file detection by hash | Pass |
+| 9 | Soft-deleted file restoration on duplicate | Pass |
+| 10 | File retrieval with integrity verification | Pass |
+| 11 | Non-existent file retrieval rejection | Pass |
+| 12 | Unauthorized user retrieval rejection | Pass |
+| 13 | Soft-delete with version entry | Pass |
+| 14 | Non-owner deletion rejection | Pass |
+| 15 | Already-deleted file rejection | Pass |
+| 16 | Legacy save() backward compatibility | Pass |
 
-**File Type Validation (ST-03):**
-- ✅ `.exe` file rejected (magic byte check) → 400 Bad Request
-- ✅ `.bat` file rejected → 400 Bad Request
-- ✅ `.jar` file rejected → 400 Bad Request
-- ✅ `.pdf` file with EXE magic bytes rejected → 400 Bad Request (magic bytes, not extension)
-- ✅ `.pdf` with valid magic bytes accepted → 201 Created
+### 3.6 Code Coverage
 
-**SHA-256 Hash Validation:**
-- ✅ File hash calculated and stored
-- ✅ Download response includes `X-File-Hash` header
-- ✅ Hash matches uploaded file → Integrity verified
+JaCoCo instruction coverage from a full local build including all 4 test classes (53 tests):
 
----
+| Metric | Value |
+|--------|-------|
+| Instructions covered | 1,340 / 4,966 |
+| Overall coverage | 27.0% |
 
-### 3.3 Code Coverage
+**Per-class highlights:**
 
-**SonarCloud Metrics:**
-```
-Lines of Code: 2,847
-Coverage: 82%
-Code Smells: 0
-Vulnerabilities: 0 (Critical)
-Security Hotspots: 2 (Reviewed & Safe)
-```
+| Class | Coverage |
+|-------|----------|
+| `FileStorageService` | 70% (581/829) |
+| `FileService` | 77% (179/233) |
+| `SecurityConfig` | 75% (75/100) |
+| `FileController` | 50% (102/204) |
+| `File` (entity) | 82% (66/80) |
 
-### 3.4 Dynamic Analysis & Configuration Validation
-
-#### 3.4.1 OAuth2 Token Validation
-Manual testing with real Auth0 tokens verified:
-- ✅ JWT signature validated (RS256)
-- ✅ Token expiration enforced (15 minutes)
-- ✅ Audience claim validated (`https://enderchest-api`)
-- ✅ Issuer claim validated (`dev-clmucvywf23kaokk.eu.auth0.com`)
-- ✅ Custom roles claim extracted and applied
-
-#### 3.4.2 API Endpoint Testing (Bruno Collection)
-```
-- 00_Auth0_Login.yml         → Real Auth0 token generation ✅
-- 01_Upload_Valid_PDF.yml    → Upload & SHA-256 verification ✅
-- 02_Upload_Valid_Image.yml  → Image upload ✅
-- 03_Security_Path_Traversal → Path traversal blocked ✅
-- 04_Security_File_Type      → Invalid file type blocked ✅
-- 05_Download_File           → File download with hash ✅
-- 06_Delete_File             → File deletion ✅
-- 07_Get_File_Versions       → Version history ✅
-- 08_Get_User_Profile        → User info from JWT ✅
-```
-
-#### 3.4.3 Security Configuration Validation
-- ✅ CSRF protection disabled (stateless API)
-- ✅ Authentication required on all non-public endpoints
-- ✅ Swagger UI endpoints public (no sensitive data)
-- ✅ Error responses generic (no stack traces to clients)
+**Note:** Classes without dedicated tests (`FolderService`, `AuditLogService`, `AccessShareController`, `FileVersionController`, `FolderController`) contribute 0–3% each, significantly reducing the aggregate figure. The security-critical classes under test achieve 50–82% coverage.
 
 ---
 
-## 4. Pipeline Automation (20%)
+## 4. CI/CD Pipeline
 
-### 4.1 CI/CD Workflow Architecture
+### 4.1 Architecture
 
 **File:** `.github/workflows/ci.yml`
 
-#### 4.1.1 Trigger Configuration
-```yaml
-on:
-  push:
-    branches: ['main']
-  pull_request:
-    branches: ['main']
+The pipeline consists of three jobs triggered on every push to `main` and every pull request:
+
+```
+┌─────────────────┐      ┌──────────────────────┐      ┌─────────────────────┐
+│ build-and-test  │─────▶│ sca                  │      │ sonar               │
+│ (compile + test)│      │ (Dependency-Check)   │      │ (SonarCloud SAST)   │
+└─────────────────┘      └──────────────────────┘      └─────────────────────┘
+        │                                                        ▲
+        └────────────────────────────────────────────────────────┘
+                         needs: build-and-test
 ```
 
-**Runs on:**
-- Every commit to main
-- Every pull request against main
-- Automated on GitHub (no manual trigger needed)
+### 4.2 Job 1: Build and Test
 
-#### 4.1.2 Job 1: Build & Test
 ```yaml
-job: build-and-test
-  runs-on: ubuntu-latest
-  steps:
-    - Checkout source
-    - Set up Java 21 (Maven cached)
-    - Run: mvn clean install
+runs-on: ubuntu-latest
+steps:
+  - Checkout source (actions/checkout@v4)
+  - Set up Java 21 (Temurin, Maven cached)
+  - Run: mvn -B clean install
 ```
 
-**Automation Value:**
-- ✅ Compiles code
-- ✅ Runs all 44 unit + integration tests
-- ✅ Fails the build if any test fails
-- ✅ Cached Maven dependencies (faster runs)
+- Compiles all source code
+- Executes all 53 automated tests
+- Fails the pipeline on any test failure
+- Uses `application-test.properties` with H2 in-memory database
 
-**Test Profile:** Uses `application-test.properties` with H2 in-memory DB
+### 4.3 Job 2: SCA — OWASP Dependency-Check
 
----
-
-#### 4.1.3 Job 2: SCA (Software Composition Analysis)
 ```yaml
-job: sca
-  runs-on: ubuntu-latest
-  needs: build-and-test  (gates on passing build)
-  steps:
-    - Run: mvn dependency-check:check
-    - Quality Gate: Fail if CVSS >= 7.0
-    - Upload: owasp-dependency-check-report.html
+needs: build-and-test
+steps:
+  - OWASP Dependency-Check Maven plugin (v10.0.4)
+  - Quality Gate: Fail if CVSS >= 7.0 (HIGH severity)
+  - Upload report artifact (retention: 30 days)
+  - NVD cache: weekly refresh via actions/cache@v4
 ```
 
-**Automation Value:**
-- ✅ Scans all Maven dependencies against NVD database
-- ✅ Blocks PRs with HIGH/CRITICAL vulnerabilities
-- ✅ Cached NVD database (weekly refresh)
-- ✅ Report artifact stored for review
-
-**Configuration:**
+**Configuration (pom.xml):**
 ```xml
-<!-- pom.xml -->
-<plugin>
-  <groupId>org.owasp</groupId>
-  <artifactId>dependency-check-maven</artifactId>
-  <version>9.2.0</version>
-  <configuration>
-    <failOnError>true</failOnError>
-    <failOnCVSSScore>7.0</failOnCVSSScore>
-  </configuration>
-</plugin>
+<artifactId>dependency-check-maven</artifactId>
+<version>10.0.4</version>
+<configuration>
+    <failBuildOnCVSS>7</failBuildOnCVSS>
+</configuration>
 ```
 
----
+### 4.4 Job 3: SAST — SonarCloud
 
-#### 4.1.4 Job 3: SAST (Static Application Security Testing)
 ```yaml
-job: sonar
-  runs-on: ubuntu-latest
-  needs: build-and-test  (gates on passing build)
-  steps:
-    - Run: mvn verify sonar:sonar
-    - Config: SonarCloud project key
-    - Coverage: Code coverage report included
+needs: build-and-test
+steps:
+  - Build with coverage: mvn -B verify sonar:sonar
+  - Project: mei-desofs-wed-nap-3_mei-desofs-wed-nap-3-sonarqube
+  - SonarCloud Quality Gate enforcement
 ```
 
-**Automation Value:**
-- ✅ Analyzes code for security vulnerabilities
-- ✅ Detects code smells and complexity issues
-- ✅ Enforces Quality Gate on PRs
-- ✅ Tracks vulnerability trends over time
+Quality Gate conditions:
+- No new Critical vulnerabilities
+- No new Blocker issues
+- Coverage threshold enforcement
 
-**SonarCloud Quality Gate:**
-- ❌ Blocks PR if new Critical vulnerabilities
-- ❌ Blocks PR if new Blockers
-- ❌ Blocks PR if coverage drops below threshold
-- ✅ Only allows merge if gate passes
+### 4.5 Caching Strategy
 
-**Project:** `mei-desofs-wed-nap-3_mei-desofs-wed-nap-3-sonarqube`  
-**Dashboard:** https://sonarcloud.io (linked in repo)
+| Cache | Key | Purpose |
+|-------|-----|---------|
+| Maven dependencies | `${{ runner.os }}-maven-${{ hashFiles('pom.xml') }}` | Skip dependency download |
+| NVD database | `owasp-nvd-${{ runner.os }}-${{ date +%Y-%U }}` | Weekly vulnerability DB refresh |
+| SonarCloud packages | `${{ runner.os }}-sonar` | Faster analysis |
 
 ---
 
-### 4.2 Dependency Caching & Optimization
+## 5. API Testing Collection (Bruno)
 
-**Maven Dependency Cache:**
-```yaml
-- uses: actions/cache@v4
-  with:
-    path: ~/.m2/repository
-    key: ${{ runner.os }}-maven-${{ hashFiles('pom.xml') }}
+### 5.1 Collection Overview
+
+A Bruno API collection with 21 pre-configured requests is provided for manual and exploratory testing:
+
+| Category | Requests | Purpose |
+|----------|----------|---------|
+| Auth | 4 | Token generation for each role (Admin, Owner, Editor, Viewer) |
+| Files/Upload | 3 | Upload valid image, valid PDF, VIEWER-denied upload |
+| Files/Download | 1 | Download file by ID |
+| Files/Delete | 2 | Owner deletion, Editor-denied deletion |
+| Admin | 2 | Admin health check, unauthenticated 401 test |
+| Security | 8 | Path traversal, blocked extensions, deduplication, hash verification |
+
+### 5.2 Collection Location
+
+```
+bruno/collection/
+├── Auth/           (Get Token Admin, Editor, Owner, Viewer)
+├── Files/
+│   ├── Upload/     (Upload Valid Image, Upload Valid PDF, Viewer Cannot Upload 403)
+│   ├── Download/   (Download File)
+│   └── Delete/     (Delete File Owner, Editor Cannot Delete 403)
+├── Admin/          (Admin Health Check, No Auth 401 Test)
+├── Security/       (Path Traversal, Block EXE/BAT/JAR/Shell, Dedup, Hash Verification)
+└── environments/   (Local — base_url: http://localhost:8080)
 ```
 
-**NVD Cache (SCA):**
-```yaml
-- uses: actions/cache@v4
-  with:
-    path: ~/.dependency-check-data
-    key: owasp-nvd-${{ runner.os }}-${{ week }}
-```
+---
 
-**Impact:** Builds run ~60% faster (dependency download skipped)
+## 6. Development Practices
+
+### 7.1 Code Review Process
+
+- GitHub branch protection rules require at least one approval per pull request
+- All pushes to `main` trigger the CI pipeline (build, test, SAST, SCA)
+- PRs are blocked if the pipeline fails
+
+### 7.2 Static Analysis (SAST)
+
+SonarCloud is configured to analyse on every build:
+- **Project key:** `mei-desofs-wed-nap-3_mei-desofs-wed-nap-3-sonarqube`
+- Quality Gate blocks merges on new critical vulnerabilities
+- Integrated with JaCoCo for coverage reporting
+
+### 7.3 Software Composition Analysis (SCA)
+
+OWASP Dependency-Check (v10.0.4) scans all Maven dependencies:
+- Fails the build on CVSS ≥ 7.0 (HIGH severity threshold)
+- NVD database cached weekly for performance
+- HTML report archived as GitHub Actions artifact (30-day retention)
+
+### 7.4 Security Audit Logging
+
+The `AuditLogService` records security-relevant events including authentication attempts, file access, and authorization failures, supporting forensic analysis and compliance requirements.
 
 ---
 
-### 4.3 Artifact Management
+## 7. Known Limitations and Future Work
 
-| Artifact | Storage | Retention | Purpose |
-|----------|---------|-----------|---------|
-| OWASP Report | GitHub Artifacts | 30 days | SCA results review |
-| SonarCloud Report | SonarCloud | Permanent | Code quality trends |
-| Build Logs | GitHub Actions | 90 days | Debugging pipeline issues |
-| Test Results | JUnit XML | In-run logs | Coverage analysis |
-
----
-
-## 5. ASVS Traceability (15%)
-
-### 5.1 ASVS v4.0 Security Controls Implemented
-
-| ASVS Level | Control | Description | Status | Evidence |
-|------------|---------|-------------|--------|----------|
-| **V1** — Arch | 1.2.1 | Verify all requests are authenticated | ✅ | SecurityConfig.java: all endpoints require JWT |
-| **V1** — Arch | 1.6.2 | Verify security controls enforce least privilege | ✅ | @PreAuthorize with specific roles (OWNER, EDITOR, etc.) |
-| **V2** — Auth | 2.1.1 | Password stored using approved hash | N/A | Using Auth0 (externalized IdP) |
-| **V2** — Auth | 2.1.5 | Authenticate using framework not custom | ✅ | Spring Security OAuth2 ResourceServer |
-| **V2** — Auth | 2.7.1 | Prevent weak password inputs | N/A | Auth0 enforces complexity |
-| **V4** — Auth | 4.1.3 | Multi-factor authentication available | N/A | Auth0 supports MFA (not required Sprint 1) |
-| **V5** — Access | 5.2.1 | Verify that paths accessed are public | ✅ | Swagger/API docs public; data endpoints protected |
-| **V5** — Access | 5.2.3 | Verify access to resources is role-based | ✅ | RBAC matrix enforced via @PreAuthorize |
-| **V5** — Access | 5.3.2 | Verify enforcing object-level authorization | ✅ | FileAccessControlIT.java: User B cannot access User A's file |
-| **V5** — Access | 5.4.1 | Verify access logs record all access | ✅ | SecurityAuditLogger records all auth events |
-| **V6** — Storage | 6.2.1 | Verify sensitive data is not cached | ✅ | No client caching headers on file endpoints |
-| **V6** — Storage | 6.2.3 | Verify sensitive data is not exposed in logs | ✅ | Logs don't include passwords, tokens, file content |
-| **V10** — Crypto | 10.1.1 | Verify cryptographic libraries are up-to-date | ✅ | Spring Security 6.x with JJWT library |
-| **V11** — API | 11.1.1 | Verify API rate limiting | ⏳ | Configured in application.properties; not tested Sprint 1 |
-| **V14** — Config | 14.2.1 | Verify environment is hardened | ✅ | H2 test DB; PostgreSQL for prod; no default credentials |
-| **V14** — Config | 14.2.2 | Verify dependencies are up-to-date | ✅ | OWASP Dependency-Check in pipeline; no vulnerabilities |
-
-### 5.2 Security Requirement to Test Mapping
-
-| Security Requirement | Test ID | Test Name | Status |
-|----------------------|---------|-----------|--------|
-| JWT authentication with expiry (SDR-01) | Unit-JWT | JwtAuthenticationConverter tests | ✅ Pass |
-| RBAC on every endpoint (SDR-02) | ST-07 | FileControllerAuthTest | ✅ 10/10 Pass |
-| JWT algorithm whitelist (SDR-NEW-01) | Unit-RS256 | Verify Auth0 RS256 enforcement | ✅ Pass |
-| Path traversal prevention (SDR-NEW-09) | ST-01 | FileUploadSecurityIT paths | ✅ 4/4 Pass |
-| File type validation (SDR-NEW-10) | ST-03 | FileUploadSecurityIT types | ✅ 6/6 Pass |
-| SHA-256 file hashing (SDR-NEW-11) | ST-Hash | FileUploadSecurityIT hash | ✅ Pass |
-| IDOR prevention (ST-02) | ST-02 | FileAccessControlIT | ✅ 10/10 Pass |
-| Role abuse prevention (T-09) | ST-09 | FileControllerAuthTest line 180 | ✅ Pass |
-| Admin endpoint protection (T-10) | ST-10 | FileControllerAuthTest line 150 | ✅ Pass |
-| Code quality gates (SAST) | SONAR | SonarCloud quality gate | ✅ Pass (0 Critical) |
-| Dependency scanning (SCA) | DC-001 | OWASP Dependency-Check | ✅ Pass (no HIGH/CRITICAL) |
+| Area | Current State | Planned (Sprint 2+) |
+|------|---------------|---------------------|
+| Token revocation | No logout blocklist | JWT blocklist on logout (ASVS V7.4.1) |
+| DAST | Not integrated | OWASP ZAP in CI pipeline |
+| IAST | Not integrated | Runtime instrumentation |
+| Rate limiting | Configured but not tested | Automated rate limit tests |
+| Coverage reporting | 27% overall (security-critical classes 50–82%) | Enforce minimum coverage threshold in CI |
+| Centralised logging | Application logs to stdout only | ELK stack (Elasticsearch, Logstash, Kibana) for aggregated log analysis and security monitoring |
 
 ---
 
-## 6. Key Findings & Recommendations
+## 8. Conclusion
 
-### 6.1 Strengths
-
-✅ **Complete RBAC implementation** with Auth0 integration  
-✅ **Comprehensive security tests** (44 total across all categories)  
-✅ **Automated security scanning** (SAST, SCA) on every commit  
-✅ **Zero critical vulnerabilities** in code and dependencies  
-✅ **Production-ready file storage** with SHA-256 + magic byte validation  
-✅ **Branch protection rules** enforcing code review & quality gates  
-
-### 6.2 Areas for Future Work (Sprint 2+)
-
-⏳ **JWT Token Blocklist on Logout** - Prevent token replay after logout (ASVS V7.4.1)  
-⏳ **DAST Integration** - OWASP ZAP in pipeline for runtime vulnerability detection  
-⏳ **IAST Integration** - Runtime instrumentation for data flow analysis  
-⏳ **Rate Limiting Tests** - Verify API rate limits are enforced (configured but not tested)  
-⏳ **AccessShare Verification** - Object-level authorization in every file operation (partially done)  
+Sprint 1 delivered a functional DevSecOps pipeline with comprehensive security controls across authentication, authorization, and file storage. The 53 automated tests (100% pass rate) verify RBAC enforcement, IDOR prevention, path traversal blocking, file type validation, SHA-256 hashing, deduplication, and soft-delete functionality. The CI/CD pipeline automates build verification, static analysis, and dependency scanning on every commit.
 
 ---
 
-## 7. Deliverables Checklist
-
-| Deliverable | Location | Status |
-|-------------|----------|--------|
-| Sprint 1 Report (this file) | Deliverables/Phase2/Sprint1/ | ✅ Complete |
-| CI/CD Pipeline (ci.yml) | .github/workflows/ci.yml | ✅ Complete |
-| RBAC Implementation (SecurityConfig, FileController) | src/main/java/config/, controller/ | ✅ Complete |
-| File Storage Security (FileStorageService) | src/main/java/service/ | ✅ Complete |
-| RBAC Tests (FileControllerAuthTest) | src/test/java/controller/ | ✅ Complete |
-| IDOR Tests (FileAccessControlIT) | src/test/java/controller/ | ✅ Complete |
-| File Security Tests (FileUploadSecurityIT) | src/test/java/integration/ | ✅ Complete |
-| Bruno API Collection | bruno/collection/ | ✅ Complete |
-| SonarCloud Integration | ci.yml + sonar-project.properties | ✅ Complete |
-| OWASP Dependency-Check | ci.yml + pom.xml | ✅ Complete |
-
----
-
-## 8. Evidence Links
-
-### 8.1 GitHub Repository
-- **Main Repo:** https://github.com/mei-desofs-wed-nap-3/mei-desofs-wed-nap-3-sonarqube
-- **Branch Protection Rules:** Settings → Branches → main
-- **CI/CD Workflow:** `.github/workflows/ci.yml`
-
-### 8.2 Code Review & Pull Requests
-- **Code Review Process:** GitHub PR reviews (1 approval required)
-- **Sample Security PR:** See commit history for auth/RBAC/file-storage changes
-- **Discussion Points:** IDOR prevention, magic byte validation, JWT token extraction from subject
-
-### 8.3 Security Scanning Reports
-- **SonarCloud:** https://sonarcloud.io/organizations/mei-desofs-wed-nap-3/projects
-- **OWASP Dependency-Check:** Run `mvn dependency-check:check` locally; artifact in GitHub Actions
-- **Test Results:** `target/surefire-reports/` after local build
-
-### 8.4 API Testing Collection
-- **Bruno Collection:** `bruno/collection/` (ready to import)
-- **Environment File:** `bruno/collection/environments/dev.yml` (pre-configured)
-- **Test Requests:** 9 requests (00-08) covering auth, CRUD, security
-
----
-
-## 9. Metrics Summary
-
-| Metric | Value | Target | Status |
-|--------|-------|--------|--------|
-| **Code Quality** | | | |
-| Code Coverage | 82% | > 75% | ✅ Pass |
-| Vulnerabilities (SAST) | 0 Critical | 0 | ✅ Pass |
-| Code Smells | 0 | 0 | ✅ Pass |
-| **Security Testing** | | | |
-| Security Tests | 25+ | > 20 | ✅ Pass |
-| RBAC Test Cases | 10 | 8 | ✅ Pass |
-| File Security Tests | 16 | 10 | ✅ Pass |
-| IDOR Test Cases | 10 | 5 | ✅ Pass |
-| **Dependencies** | | | |
-| Vulnerabilities (SCA) | 0 | 0 | ✅ Pass |
-| HIGH/CRITICAL CVEs | 0 | 0 | ✅ Pass |
-| **Pipeline** | | | |
-| Build Time | ~3-4 min | < 10 min | ✅ Pass |
-| Test Execution | ~8-10 min | < 15 min | ✅ Pass |
-| SAST Scan | ~2 min | < 5 min | ✅ Pass |
-| SCA Scan | ~1 min | < 3 min | ✅ Pass |
-
----
-
-## 10. Conclusion
-
-**Sprint 1 of Phase 2 successfully delivered a secure, well-tested, and production-ready API foundation.** The team implemented:
-
-1. ✅ **Automated DevSecOps pipeline** with SAST, SCA, and build quality gates
-2. ✅ **OAuth2 authentication** with Auth0 and role-based access control
-3. ✅ **File storage security** with SHA-256 hashing and path traversal prevention
-4. ✅ **Comprehensive security testing** proving RBAC, IDOR prevention, and threat mitigation
-5. ✅ **Code review process** with branch protection and automated quality gates
-6. ✅ **API testing collection** (Bruno) ready for team validation
-
-**Security posture:**
-- **44 tests passing** (100% pass rate)
-- **0 critical vulnerabilities** in code and dependencies
-- **82% code coverage** with focus on security-critical paths
-- **ASVS compliance:** 16/16 security controls implemented
-
-**Ready for Sprint 2:** Object-level authorization (IDOR), JWT logout blocklist, DAST/IAST integration.
-
----
-
-**Report compiled:** May 18, 2026  
-**Team:** Developer 1 (Pipeline), Developer 2 (Auth), Developer 3 (File Storage), Developer 4 (Testing & Documentation)  
-**Course:** DESOFS 2026 | WED_NAP_3
-
+**Report Date:** May 18, 2026  
+**Team:** WED_NAP_3  
+**Course:** DESOFS 2026
