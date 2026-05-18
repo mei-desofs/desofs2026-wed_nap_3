@@ -18,6 +18,7 @@ import java.util.UUID;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.tika.Tika;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -148,7 +149,8 @@ public class FileStorageService {
      * @throws FileUploadException If storage or hashing fails
      */
     @Transactional
-    public UploadResponse uploadFile(MultipartFile file, String uploadedBy, UUID folderId)
+    @NonNull
+    public UploadResponse uploadFile(@NonNull MultipartFile file, @NonNull String uploadedBy, UUID folderId)
             throws InvalidFileTypeException, PathTraversalAttemptException, FolderNotFoundException, FileUploadException {
 
         try {
@@ -284,7 +286,8 @@ public class FileStorageService {
      * @throws FileUploadException If storage or hashing fails
      */
     @Transactional
-    public UploadResponse uploadFile(MultipartFile file, String uploadedBy)
+    @NonNull
+    public UploadResponse uploadFile(@NonNull MultipartFile file, @NonNull String uploadedBy)
             throws InvalidFileTypeException, PathTraversalAttemptException, FileUploadException {
         try {
             return uploadFile(file, uploadedBy, null);
@@ -303,7 +306,8 @@ public class FileStorageService {
      * @throws FileUploadException If file not found or access denied
      */
     @Transactional(readOnly = true)
-    public FileResponse retrieveFile(UUID fileId, String requestedBy) throws FileUploadException {
+    @NonNull
+    public FileResponse retrieveFile(@NonNull UUID fileId, @NonNull String requestedBy) throws FileUploadException {
         Optional<File> optionalFile = fileRepository.findByIdAndIsDeletedFalse(fileId);
 
         if (optionalFile.isEmpty()) {
@@ -349,7 +353,7 @@ public class FileStorageService {
      * @throws FileUploadException If file not found or access denied
      */
     @Transactional
-    public void deleteFile(UUID fileId, String deletedBy) throws FileUploadException {
+    public void deleteFile(@NonNull UUID fileId, @NonNull String deletedBy) throws FileUploadException {
         Optional<File> optionalFile = fileRepository.findByIdAndIsDeletedFalse(fileId);
 
         if (optionalFile.isEmpty()) {
@@ -398,7 +402,7 @@ public class FileStorageService {
      * @throws FileUploadException If file not found or access denied
      */
     @Transactional
-    public void softDeleteFile(UUID fileId, String deletedBy) throws FileUploadException {
+    public void softDeleteFile(@NonNull UUID fileId, @NonNull String deletedBy) throws FileUploadException {
         deleteFile(fileId, deletedBy);
     }
 
@@ -414,7 +418,7 @@ public class FileStorageService {
      * @return Total bytes used by user (0 if no files)
      */
     @Transactional(readOnly = true)
-    public Long calculateUserStorageUsage(String uploadedBy) {
+    public Long calculateUserStorageUsage(@NonNull String uploadedBy) {
         try {
             Long usage = fileRepository.calculateUserStorageUsageByString(uploadedBy);
             log.debug("Calculated storage usage for user {}: {} bytes", uploadedBy, usage);
@@ -439,6 +443,7 @@ public class FileStorageService {
      * @throws FolderNotFoundException If folderId provided but folder not found or deleted
      */
     @Transactional(readOnly = true)
+    @NonNull
     public List<File> listFilesInFolder(UUID folderId) throws FolderNotFoundException {
         try {
             // Verify folder exists if folderId provided

@@ -21,12 +21,10 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import pt.isep.desofs.enderchest.entity.AccessShare;
 import pt.isep.desofs.enderchest.entity.File;
-import pt.isep.desofs.enderchest.entity.User;
-import pt.isep.desofs.enderchest.repository.AccessShareRepository;
-import pt.isep.desofs.enderchest.repository.FileRepository;
-import pt.isep.desofs.enderchest.repository.UserRepository;
+import pt.isep.desofs.enderchest.exception.resource.FileNotFoundException;
+import pt.isep.desofs.enderchest.exception.security.FileAccessDeniedException;
+import pt.isep.desofs.enderchest.service.FileService;
 import pt.isep.desofs.enderchest.service.FileStorageService;
 import pt.isep.desofs.enderchest.service.dto.FileDeleteResponse;
 import pt.isep.desofs.enderchest.service.dto.UploadResponse;
@@ -34,7 +32,6 @@ import pt.isep.desofs.enderchest.service.dto.UploadResponse;
 import java.net.MalformedURLException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -73,9 +70,7 @@ import java.util.UUID;
 public class FileController {
 
     private final FileStorageService fileStorageService;
-    private final FileRepository fileRepository;
-    private final AccessShareRepository accessShareRepository;
-    private final UserRepository userRepository;
+    private final FileService fileService;
 
     /**
      * Upload a file to storage.
@@ -83,6 +78,8 @@ public class FileController {
      *
      * The userId is extracted from the JWT subject (sub) claim to prevent
      * header forgery attacks.
+     *
+     * Business logic delegated to FileStorageService.
      */
     @PostMapping("/upload")
     @Transactional
@@ -123,43 +120,35 @@ public class FileController {
      * Download a file by its ID.
      * OWNER, EDITOR and VIEWER can download files they have access to (SDR-02).
      *
-     * Note: object-level AccessShare check (IDOR prevention) is performed
-     * by the FileStorageService before any I/O occurs.
+     * Access control is delegated to FileService.downloadFile() which performs
+     * IDOR prevention checks (AC-04 / ST-02) before returning the file.
      */
     @GetMapping("/{fileId}")
     @Transactional(readOnly = true)
     @PreAuthorize("hasAuthority('ROLE_OWNER') or hasAuthority('ROLE_EDITOR') or hasAuthority('ROLE_VIEWER')")
+    @Operation(summary = "Download a file", description = "Download a file by ID with SHA-256 integrity verification")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "File downloaded successfully"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized - missing or invalid bearer token"),
+            @ApiResponse(responseCode = "403", description = "Forbidden - insufficient access to file"),
+            @ApiResponse(responseCode = "404", description = "File not found or has been deleted"),
+            @ApiResponse(responseCode = "500", description = "Internal server error")
+    })
     @SuppressWarnings("null")
     public ResponseEntity<Resource> downloadFile(
             @PathVariable UUID fileId,
             @AuthenticationPrincipal Jwt jwt) {
 
-        // Extract userId from JWT subject claim — never trust client-supplied headers
-        String userId = jwt.getSubject();
+        // Extract email from JWT to verify caller identity
+        String callerEmail = jwt.getClaimAsString("email");
 
-        log.info("File download initiated by user: {} for fileId: {}", userId, fileId);
-
-        Optional<File> fileOptional = fileRepository.findById(fileId);
-
-        if (fileOptional.isEmpty()) {
-            log.warn("File not found. FileId: {}", fileId);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        }
-
-        File file = fileOptional.get();
-
-        if (!file.isActive()) {
-            log.warn("File has been deleted. FileId: {}", fileId);
-            return ResponseEntity.status(HttpStatus.GONE).build();
-        }
-
-        // IDOR check (AC-04 / ST-02): verify caller is the owner OR has an AccessShare record
-        if (!hasReadAccess(file, jwt)) {
-            log.warn("IDOR attempt blocked: user {} attempted to access file {} without permission", userId, fileId);
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
+        log.info("File download initiated by user: {} for fileId: {}", callerEmail, fileId);
 
         try {
+            // Delegate to FileService for access control and file retrieval
+            File file = fileService.downloadFile(fileId, callerEmail);
+
+            // Construct file path and load resource
             Path filePath = Paths.get(file.getStorageLocation());
             Resource resource = new UrlResource(filePath.toUri());
 
@@ -168,12 +157,7 @@ public class FileController {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
             }
 
-            String calculatedHash = calculateFileHash(filePath);
-            if (!calculatedHash.equals(file.getSha256Hash())) {
-                log.error("Hash mismatch for file. FileId: {}", fileId);
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-            }
-
+            // Build HTTP response headers
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(
                     org.springframework.http.MediaType.parseMediaType(file.getMimeType())
@@ -187,6 +171,12 @@ public class FileController {
                     .headers(headers)
                     .body(resource);
 
+        } catch (FileNotFoundException e) {
+            log.warn("File not found: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        } catch (FileAccessDeniedException e) {
+            log.warn("IDOR attempt blocked: user {} attempted to access file {} without permission", callerEmail, fileId);
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         } catch (MalformedURLException e) {
             log.error("Invalid file URL. FileId: {}", fileId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -197,8 +187,8 @@ public class FileController {
      * Delete a file (soft delete).
      * Only OWNER can delete files (SDR-02, T-09 mitigation — Editor cannot delete).
      *
-     * Note: object-level AccessShare check (IDOR prevention) is performed
-     * by the FileStorageService before any I/O occurs.
+     * Access control is delegated to FileService.deleteFile() which performs
+     * IDOR prevention checks (AC-04 / ST-02) before deletion.
      */
     @DeleteMapping("/{fileId}")
     @Transactional
@@ -208,8 +198,8 @@ public class FileController {
             @ApiResponse(responseCode = "200", description = "File deleted successfully", content = @Content(schema = @Schema(implementation = FileDeleteResponse.class))),
             @ApiResponse(responseCode = "401", description = "Unauthorized - missing or invalid bearer token"),
             @ApiResponse(responseCode = "403", description = "Forbidden - only OWNER can delete files"),
-            @ApiResponse(responseCode = "404", description = "File not found"),
-            @ApiResponse(responseCode = "410", description = "File already deleted")
+            @ApiResponse(responseCode = "404", description = "File not found or already deleted"),
+            @ApiResponse(responseCode = "500", description = "Internal server error")
     })
     @SuppressWarnings("null")
     public ResponseEntity<FileDeleteResponse> deleteFile(
@@ -218,43 +208,33 @@ public class FileController {
             UUID fileId,
             @AuthenticationPrincipal Jwt jwt) {
 
-        // Extract userId from JWT subject claim — never trust client-supplied headers
-        String userId = jwt.getSubject();
+        // Extract email from JWT to verify caller identity
+        String callerEmail = jwt.getClaimAsString("email");
 
-        log.info("File deletion initiated by user: {} for fileId: {}", userId, fileId);
+        log.info("File deletion initiated by user: {} for fileId: {}", callerEmail, fileId);
 
-        Optional<File> fileOptional = fileRepository.findById(fileId);
+        try {
+            // Delegate to FileService for access control and deletion
+            // FileService.deleteFile() handles all access checks and performs the soft delete
+            fileService.deleteFile(fileId, callerEmail);
 
-        if (fileOptional.isEmpty()) {
-            log.warn("File not found for deletion. FileId: {}", fileId);
+            // Build success response with current timestamp
+            FileDeleteResponse response = new FileDeleteResponse(
+                    fileId,
+                    java.time.LocalDateTime.now(),
+                    "File deleted successfully"
+            );
+
+            log.info("File deleted successfully. FileId: {}", fileId);
+            return ResponseEntity.ok(response);
+
+        } catch (FileNotFoundException e) {
+            log.warn("File not found: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        }
-
-        File file = fileOptional.get();
-
-        if (!file.isActive()) {
-            log.warn("File already deleted. FileId: {}", fileId);
-            return ResponseEntity.status(HttpStatus.GONE).build();
-        }
-
-        // IDOR check (AC-04 / ST-02): verify caller is the owner OR has an OWNER-level AccessShare record
-        if (!hasOwnerAccess(file, jwt)) {
-            log.warn("IDOR attempt blocked: user {} attempted to delete file {} without ownership", userId, fileId);
+        } catch (FileAccessDeniedException e) {
+            log.warn("IDOR attempt blocked: user {} attempted to delete file {} without ownership", callerEmail, fileId);
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
-
-        file.softDelete();
-        fileRepository.save(file);
-
-        log.info("File deleted successfully. FileId: {}, DeletedAt: {}", fileId, file.getDeletedAt());
-
-        FileDeleteResponse response = new FileDeleteResponse(
-                fileId,
-                file.getDeletedAt(),
-                "File deleted successfully"
-        );
-
-        return ResponseEntity.ok(response);
     }
 
     /**
@@ -277,108 +257,5 @@ public class FileController {
     })
     public ResponseEntity<String> adminHealth() {
         return ResponseEntity.ok("Admin health check: OK");
-    }
-
-    /**
-     * IDOR Prevention (AC-04 / ST-02): Check if caller has read access to a file.
-     *
-     * A user has read access if:
-     * 1. They are the uploader (owner by creation), OR
-     * 2. They have an explicit AccessShare record (OWNER, EDITOR or VIEWER) for this file.
-     *
-     * The caller's internal User UUID is resolved via the "email" claim in the JWT
-     * (Auth0 includes email as a standard claim).
-     */
-    private boolean hasReadAccess(File file, Jwt jwt) {
-        String jwtSub = jwt.getSubject();
-
-        // Check 1: uploader is always allowed
-        if (file.getUploadedBy().equals(jwtSub)) {
-            return true;
-        }
-
-        // Check 2: look for an AccessShare record
-        Optional<UUID> callerUuid = resolveUserUuid(jwt);
-        if (callerUuid.isEmpty()) {
-            log.warn("IDOR check: could not resolve internal UUID for subject={}", jwtSub);
-            return false;
-        }
-
-        Optional<AccessShare> share = accessShareRepository
-                .findByResourceIdAndResourceTypeAndGrantedToUserId(
-                        file.getId(), AccessShare.ResourceType.FILE, callerUuid.get());
-
-        return share.isPresent(); // any role (OWNER/EDITOR/VIEWER) grants read
-    }
-
-    /**
-     * IDOR Prevention (AC-04 / ST-02): Check if caller has OWNER-level access to a file.
-     *
-     * A user has owner access if:
-     * 1. They are the uploader (owner by creation), OR
-     * 2. They have an explicit AccessShare record with RoleType.OWNER for this file.
-     */
-    private boolean hasOwnerAccess(File file, Jwt jwt) {
-        String jwtSub = jwt.getSubject();
-
-        // Check 1: uploader is always the owner
-        if (file.getUploadedBy().equals(jwtSub)) {
-            return true;
-        }
-
-        // Check 2: look for an OWNER-level AccessShare record
-        Optional<UUID> callerUuid = resolveUserUuid(jwt);
-        if (callerUuid.isEmpty()) {
-            log.warn("IDOR owner check: could not resolve internal UUID for subject={}", jwtSub);
-            return false;
-        }
-
-        Optional<AccessShare> share = accessShareRepository
-                .findByResourceIdAndResourceTypeAndGrantedToUserId(
-                        file.getId(), AccessShare.ResourceType.FILE, callerUuid.get());
-
-        return share.isPresent() && share.get().isOwner();
-    }
-
-    /**
-     * Resolve the internal system UUID for the JWT caller.
-     *
-     * Auth0 JWTs include the user's email as the "email" claim.
-     * We look up the User entity by that email to obtain the internal UUID
-     * used in AccessShare records.
-     *
-     * Returns empty if the user has no local User record (e.g. first-time users
-     * who have authenticated but not yet been provisioned).
-     */
-    private Optional<UUID> resolveUserUuid(Jwt jwt) {
-        String email = jwt.getClaimAsString("email");
-        if (email == null || email.isBlank()) {
-            return Optional.empty();
-        }
-        return userRepository.findByEmail(email)
-                .map(User::getUserId);
-    }
-
-    /**
-     * Calculate SHA-256 hash of a file for integrity verification (SDR-NEW-11).
-     */
-    private String calculateFileHash(Path filePath) {
-        try {
-            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
-            byte[] buffer = new byte[8192];
-            int bytesRead;
-
-            try (java.io.FileInputStream fis = new java.io.FileInputStream(filePath.toFile())) {
-                while ((bytesRead = fis.read(buffer)) != -1) {
-                    digest.update(buffer, 0, bytesRead);
-                }
-            }
-
-            byte[] hashBytes = digest.digest();
-            return java.util.HexFormat.of().formatHex(hashBytes);
-        } catch (Exception e) {
-            log.error("Error calculating file hash for path: {}", filePath, e);
-            return "";
-        }
     }
 }

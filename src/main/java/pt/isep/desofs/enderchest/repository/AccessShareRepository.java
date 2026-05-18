@@ -1,11 +1,13 @@
 package pt.isep.desofs.enderchest.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Repository;
 import pt.isep.desofs.enderchest.entity.AccessShare;
 import pt.isep.desofs.enderchest.entity.AccessShare.ResourceType;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -42,6 +44,7 @@ public interface AccessShareRepository extends JpaRepository<AccessShare, UUID> 
      * @param resourceType The type of resource (FILE or FOLDER)
      * @return List of AccessShare records for the specified resource
      */
+    @NonNull
     List<AccessShare> findByResourceIdAndResourceType(UUID resourceId, ResourceType resourceType);
 
     /**
@@ -56,6 +59,7 @@ public interface AccessShareRepository extends JpaRepository<AccessShare, UUID> 
      * @param grantedToUserId The UUID of the user who has been granted access
      * @return List of AccessShare records for the specified user
      */
+    @NonNull
     List<AccessShare> findByGrantedToUserId(UUID grantedToUserId);
 
     /**
@@ -69,7 +73,8 @@ public interface AccessShareRepository extends JpaRepository<AccessShare, UUID> 
      * @param grantedToUserId The UUID of the user granted access
      * @return Optional containing the AccessShare if found, empty otherwise
      */
-    java.util.Optional<AccessShare> findByResourceIdAndResourceTypeAndGrantedToUserId(
+    @NonNull
+    Optional<AccessShare> findByResourceIdAndResourceTypeAndGrantedToUserId(
             UUID resourceId,
             ResourceType resourceType,
             UUID grantedToUserId
