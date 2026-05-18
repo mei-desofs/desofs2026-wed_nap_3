@@ -1,0 +1,28 @@
+meta {
+  name: Admin Health Check
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{base_url}}/api/v1/files/admin/health
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  ST-07 — RBAC Authorization Test (Admin Endpoint)
+  
+  Expected results by role:
+  - ADMIN  → 200 OK ("Admin health check: OK")
+  - OWNER  → 403 Forbidden
+  - EDITOR → 403 Forbidden
+  - VIEWER → 403 Forbidden
+  - No token → 401 Unauthorized
+  
+  Mitigates: SDR-02 (RBAC), T-10 (Unauthorized Access to Admin Endpoints)
+}

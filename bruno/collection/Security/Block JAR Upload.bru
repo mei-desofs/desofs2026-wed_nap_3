@@ -1,0 +1,30 @@
+meta {
+  name: Block JAR Upload
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{base_url}}/api/v1/files/upload
+  body: multipart-form
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:multipart-form {
+  file: @file(test-files/app.jar)
+}
+
+docs {
+  ST-03 — Block JAR file upload (magic bytes: PK)
+  
+  Expected: 415 Unsupported Media Type (InvalidFileTypeException)
+  
+  Ficheiro necessário: test-files/app.jar
+  (Criar com: printf 'PK' > test-files/app.jar)
+  
+  Mitigates: SDR-05 (MIME validation), T-06, AC-03
+}

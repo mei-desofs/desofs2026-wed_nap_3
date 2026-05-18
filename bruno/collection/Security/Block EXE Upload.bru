@@ -1,0 +1,34 @@
+meta {
+  name: Block EXE Upload
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{base_url}}/api/v1/files/upload
+  body: multipart-form
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:multipart-form {
+  file: @file(test-files/malware.exe)
+}
+
+docs {
+  ST-03 — Web Shell / Malicious File Upload Prevention (T-06, AC-03)
+  
+  Tenta fazer upload de um ficheiro .exe (magic bytes: MZ).
+  Apache Tika deteta o tipo real via magic bytes — independentemente
+  do Content-Type enviado pelo cliente.
+  
+  Expected: 415 Unsupported Media Type (InvalidFileTypeException)
+  
+  Ficheiro necessário: test-files/malware.exe
+  (Criar com: printf 'MZ' > test-files/malware.exe)
+  
+  Mitigates: SDR-05 (MIME validation), T-06, AC-03
+}

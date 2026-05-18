@@ -1,0 +1,33 @@
+meta {
+  name: Get Token Viewer
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{auth0_domain}}/oauth/token
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "client_id": "{{client_id}}",
+    "client_secret": "{{client_secret}}",
+    "audience": "{{audience}}",
+    "grant_type": "password",
+    "username": "viewer@test.com",
+    "password": "V13w3r@DESOFS_2026#Secure!"
+  }
+}
+
+script:post-response {
+  if (res.status === 200) {
+    bru.setVar("token", res.body.access_token);
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
