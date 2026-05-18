@@ -18,6 +18,7 @@ import java.util.UUID;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.tika.Tika;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -39,7 +40,7 @@ import pt.isep.desofs.enderchest.service.dto.UploadResponse;
 
 /**
  * Enhanced FileStorageService with SHA-256 hashing, database persistence, and version tracking.
- * 
+ *
  * Implements SDR-NEW-11 (File Upload Logic) with:
  * - Streaming SHA-256 hashing (O(1) memory overhead)
  * - Deduplication via hash-based lookup
@@ -49,14 +50,14 @@ import pt.isep.desofs.enderchest.service.dto.UploadResponse;
  * - Path traversal and MIME type validation
  * - Transactional database operations
  * - Storage quota tracking
- * 
+ *
  * Performance targets:
  * - Upload confirmation: <100ms (DB write only)
  * - Hash lookup (deduplication): <20ms
  * - File retrieval: <5ms
  * - Hash calculation: O(1) memory regardless of file size
  * - Storage quota calculation: <50ms
- * 
+ *
  * @author Backend Architecture
  * @version 3.0
  */
@@ -73,7 +74,7 @@ public class FileStorageService {
 
     /**
      * Constructor with dependency injection for repositories and configuration.
-     * 
+     *
      * @param props Application configuration with storage settings
      * @param fileRepository Repository for File entity persistence
      * @param fileVersionRepository Repository for FileVersion entity persistence
@@ -110,7 +111,7 @@ public class FileStorageService {
 
     /**
      * Upload a file with SHA-256 hashing, deduplication, storage quota enforcement, and persistence to an optional folder.
-     * 
+     *
      * Implements the complete upload workflow:
      * 1. Validates filename and detects path traversal attempts
      * 2. Validates MIME type using Apache Tika magic bytes
@@ -122,7 +123,7 @@ public class FileStorageService {
      * 8. Checks for duplicate files (deduplication)
      * 9. Persists file metadata with folder reference and creates initial version record
      * 10. Stores file on disk with restricted permissions (0600)
-     * 
+     *
      * Security measures:
      * - Path traversal detection (.. sequences, leading /)
      * - MIME type validation against allowlist
@@ -130,13 +131,13 @@ public class FileStorageService {
      * - UUID-based stored filename (prevents enumeration)
      * - File permissions (0600 - owner read/write only)
      * - Folder access validation
-     * 
+     *
      * Performance:
      * - SHA-256 calculated during file read (single pass)
      * - DigestInputStream prevents loading entire file in memory
      * - Storage quota calculation: <50ms with index
      * - Database writes transactional and optimized
-     * 
+     *
      * @param file MultipartFile uploaded by user
      * @param uploadedBy User ID or email (from JWT subject)
      * @param folderId Optional folder ID where file should be stored (null for root)
@@ -148,9 +149,10 @@ public class FileStorageService {
      * @throws FileUploadException If storage or hashing fails
      */
     @Transactional
-    public UploadResponse uploadFile(MultipartFile file, String uploadedBy, UUID folderId)
+    @NonNull
+    public UploadResponse uploadFile(@NonNull MultipartFile file, @NonNull String uploadedBy, UUID folderId)
             throws InvalidFileTypeException, PathTraversalAttemptException, FolderNotFoundException, FileUploadException {
-        
+
         try {
             // Step 1: Validate filename for null/empty
             String originalFilename = file.getOriginalFilename();
@@ -166,7 +168,7 @@ public class FileStorageService {
             long maxFileSize = props.storage().maxFileSizeInBytes();
             if (fileSize > maxFileSize) {
                 throw new FileUploadException(
-                    String.format("File size (%d bytes) exceeds maximum allowed (%d bytes)", fileSize, maxFileSize)
+                        String.format("File size (%d bytes) exceeds maximum allowed (%d bytes)", fileSize, maxFileSize)
                 );
             }
 
@@ -188,23 +190,25 @@ public class FileStorageService {
             // Step 5: Validate MIME type using Tika (T-06 mitigation)
             String detectedMimeType = tika.detect(file.getInputStream());
             if (!props.storage().allowedMimeTypes().contains(detectedMimeType)) {
-                throw new InvalidFileTypeException(detectedMimeType, 
-                    String.join(", ", props.storage().allowedMimeTypes()));
+                throw new InvalidFileTypeException(detectedMimeType,
+                        String.join(", ", props.storage().allowedMimeTypes()));
             }
 
             // Step 6: Check storage quota enforcement (SDR-NEW-07)
             long userCurrentUsage = calculateUserStorageUsage(uploadedBy);
             long storageQuota = props.storage().storageQuotaInBytes();
             if ((userCurrentUsage + fileSize) > storageQuota) {
-                log.warn("Storage quota exceeded: userId={}, currentUsage={}, fileSize={}, quota={}", 
+                log.warn("Storage quota exceeded: userId={}, currentUsage={}, fileSize={}, quota={}",
                         uploadedBy, userCurrentUsage, fileSize, storageQuota);
                 throw new StorageQuotaExceededException(
-                    uploadedBy, userCurrentUsage, storageQuota, fileSize
+                        uploadedBy, userCurrentUsage, storageQuota, fileSize
                 );
             }
 
+
             // Step 7: Calculate SHA-256 hash while storing file
-            String sha256Hash = calculateSha256AndStoreFile(file, originalFilename);
+            String storedFileName = UUID.randomUUID().toString();
+            String sha256Hash = calculateSha256AndStoreFile(file, originalFilename, storedFileName);
 
             // Step 8: Deduplication check
             Optional<File> existingFile = fileRepository.findBySha256Hash(sha256Hash);
@@ -225,31 +229,30 @@ public class FileStorageService {
             }
 
             // Step 8: Persist file metadata to database
-            String storedFileName = UUID.randomUUID().toString();
             Path storagePath = rootLocation.resolve(storedFileName).normalize().toAbsolutePath();
 
             File fileEntity = new File(
-                originalFilename,
-                storedFileName,
-                sha256Hash,
-                fileSize,
-                detectedMimeType,
-                uploadedBy,
-                storagePath.toString()
+                    originalFilename,
+                    storedFileName,
+                    sha256Hash,
+                    fileSize,
+                    detectedMimeType,
+                    uploadedBy,
+                    storagePath.toString()
             );
             fileEntity.setFolderId(folderId);
 
             File savedFile = fileRepository.save(fileEntity);
-            log.debug("Persisted file entity: id={}, hash={}, size={}, folderId={}", 
+            log.debug("Persisted file entity: id={}, hash={}, size={}, folderId={}",
                     savedFile.getId(), sha256Hash, fileSize, folderId);
 
             // Step 9: Create initial FileVersion entry for audit trail
             FileVersion initialVersion = new FileVersion(
-                savedFile,
-                1,
-                sha256Hash,
-                uploadedBy,
-                "Initial upload"
+                    savedFile,
+                    1,
+                    sha256Hash,
+                    uploadedBy,
+                    "Initial upload"
             );
             fileVersionRepository.save(initialVersion);
             log.debug("Created initial file version: fileId={}, versionNumber=1", savedFile.getId());
@@ -274,7 +277,7 @@ public class FileStorageService {
     /**
      * Upload a file to root-level (backward compatibility method).
      * Delegates to uploadFile(MultipartFile, String, UUID) with null folderId.
-     * 
+     *
      * @param file MultipartFile uploaded by user
      * @param uploadedBy User ID or email (from JWT subject)
      * @return UploadResponse with file ID, hash, size, and metadata
@@ -283,7 +286,8 @@ public class FileStorageService {
      * @throws FileUploadException If storage or hashing fails
      */
     @Transactional
-    public UploadResponse uploadFile(MultipartFile file, String uploadedBy)
+    @NonNull
+    public UploadResponse uploadFile(@NonNull MultipartFile file, @NonNull String uploadedBy)
             throws InvalidFileTypeException, PathTraversalAttemptException, FileUploadException {
         try {
             return uploadFile(file, uploadedBy, null);
@@ -295,16 +299,17 @@ public class FileStorageService {
 
     /**
      * Retrieve a file by ID with integrity verification.
-     * 
+     *
      * @param fileId UUID of the file to retrieve
      * @param requestedBy User ID making the request (for access control)
      * @return FileResponse with file content and metadata
      * @throws FileUploadException If file not found or access denied
      */
     @Transactional(readOnly = true)
-    public FileResponse retrieveFile(UUID fileId, String requestedBy) throws FileUploadException {
+    @NonNull
+    public FileResponse retrieveFile(@NonNull UUID fileId, @NonNull String requestedBy) throws FileUploadException {
         Optional<File> optionalFile = fileRepository.findByIdAndIsDeletedFalse(fileId);
-        
+
         if (optionalFile.isEmpty()) {
             throw new FileUploadException("File not found or has been deleted");
         }
@@ -340,17 +345,17 @@ public class FileStorageService {
 
     /**
      * Soft delete a file (mark as deleted, keep content for recovery).
-     * 
+     *
      * Creates a FileVersion entry documenting the deletion.
-     * 
+     *
      * @param fileId UUID of the file to delete
      * @param deletedBy User ID performing the deletion
      * @throws FileUploadException If file not found or access denied
      */
     @Transactional
-    public void deleteFile(UUID fileId, String deletedBy) throws FileUploadException {
+    public void deleteFile(@NonNull UUID fileId, @NonNull String deletedBy) throws FileUploadException {
         Optional<File> optionalFile = fileRepository.findByIdAndIsDeletedFalse(fileId);
-        
+
         if (optionalFile.isEmpty()) {
             throw new FileUploadException("File not found or already deleted");
         }
@@ -371,11 +376,11 @@ public class FileStorageService {
             // Create FileVersion entry documenting deletion
             long nextVersionNumber = fileVersionRepository.countByFileId(fileId) + 1;
             FileVersion deleteVersion = new FileVersion(
-                file,
-                (int) nextVersionNumber,
-                file.getSha256Hash(),
-                deletedBy,
-                "Deleted by user"
+                    file,
+                    (int) nextVersionNumber,
+                    file.getSha256Hash(),
+                    deletedBy,
+                    "Deleted by user"
             );
             fileVersionRepository.save(deleteVersion);
 
@@ -389,31 +394,31 @@ public class FileStorageService {
 
     /**
      * Soft delete a file (mark as deleted, keep content for recovery) - alternative method name.
-     * 
+     *
      * Creates a FileVersion entry documenting the deletion.
-     * 
+     *
      * @param fileId UUID of the file to delete
      * @param deletedBy User ID performing the deletion
      * @throws FileUploadException If file not found or access denied
      */
     @Transactional
-    public void softDeleteFile(UUID fileId, String deletedBy) throws FileUploadException {
+    public void softDeleteFile(@NonNull UUID fileId, @NonNull String deletedBy) throws FileUploadException {
         deleteFile(fileId, deletedBy);
     }
 
     /**
      * Calculate total storage usage (in bytes) for a specific user.
-     * 
+     *
      * Sums all file sizes for non-deleted files uploaded by the user.
      * Used for quota enforcement and storage statistics.
-     * 
+     *
      * Performance: Query execution time <50ms with proper indexing.
-     * 
+     *
      * @param uploadedBy User ID (from JWT subject) to calculate storage for
      * @return Total bytes used by user (0 if no files)
      */
     @Transactional(readOnly = true)
-    public Long calculateUserStorageUsage(String uploadedBy) {
+    public Long calculateUserStorageUsage(@NonNull String uploadedBy) {
         try {
             Long usage = fileRepository.calculateUserStorageUsageByString(uploadedBy);
             log.debug("Calculated storage usage for user {}: {} bytes", uploadedBy, usage);
@@ -426,18 +431,19 @@ public class FileStorageService {
 
     /**
      * List all active (non-deleted) files in a specific folder.
-     * 
+     *
      * Used for folder-based file listing and navigation.
      * Verifies folder exists and is not deleted (if folderId provided).
      * Returns only non-deleted files.
-     * 
+     *
      * Performance: Query execution time O(log n + k) where k is files in folder.
-     * 
+     *
      * @param folderId The UUID of the folder (null for root-level files)
      * @return List of active files in the folder (empty list if folder empty)
      * @throws FolderNotFoundException If folderId provided but folder not found or deleted
      */
     @Transactional(readOnly = true)
+    @NonNull
     public List<File> listFilesInFolder(UUID folderId) throws FolderNotFoundException {
         try {
             // Verify folder exists if folderId provided
@@ -469,7 +475,7 @@ public class FileStorageService {
      * - "/" or "\" characters (directory separators)
      * - Leading slashes (absolute paths)
      * - Null or empty filenames
-     * 
+     *
      * @param filename The filename to validate
      * @throws PathTraversalAttemptException If validation fails
      */
@@ -491,27 +497,25 @@ public class FileStorageService {
      * Calculate SHA-256 hash while storing file.
      * Uses DigestInputStream to compute hash in a single pass without loading
      * entire file into memory.
-     * 
+     *
      * Implementation strategy:
      * - Read file through DigestInputStream (computes hash while reading)
      * - Generate UUID-based stored filename
      * - Write to disk with restricted permissions (0600)
      * - Return hex-encoded hash
-     * 
+     *
      * @param file MultipartFile to hash and store
      * @param originalFilename Original filename (for context only)
      * @return SHA-256 hash as hex string (64 characters)
      * @throws IOException If file operations fail
      * @throws NoSuchAlgorithmException If SHA-256 algorithm not available
      */
-    private String calculateSha256AndStoreFile(MultipartFile file, String originalFilename)
+    private String calculateSha256AndStoreFile(MultipartFile file, String originalFilename, String storedFileName)
             throws IOException, NoSuchAlgorithmException {
-        
+
         // Create MessageDigest for SHA-256
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
 
-        // Generate UUID-based stored filename
-        String storedFileName = UUID.randomUUID().toString();
         Path destinationFile = rootLocation.resolve(storedFileName).normalize().toAbsolutePath();
 
         // Verify destination is within root (final security check)
@@ -521,14 +525,14 @@ public class FileStorageService {
 
         try (InputStream inputStream = file.getInputStream();
              DigestInputStream digestStream = new DigestInputStream(inputStream, digest)) {
-            
+
             // Copy file to disk while computing hash
             Files.copy(digestStream, destinationFile);
 
             // Set restricted file permissions (0600 - owner read/write only)
             try {
-                Files.setPosixFilePermissions(destinationFile, 
-                    EnumSet.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE));
+                Files.setPosixFilePermissions(destinationFile,
+                        EnumSet.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE));
             } catch (UnsupportedOperationException e) {
                 // POSIX not supported (e.g., Windows) - log but continue
                 log.debug("POSIX file permissions not supported on this platform");
@@ -537,10 +541,10 @@ public class FileStorageService {
 
         // Get computed hash digest
         byte[] hashBytes = digest.digest();
-        
+
         // Convert to hex string using HexFormat (Java 17+)
         String hexHash = HexFormat.of().formatHex(hashBytes);
-        
+
         log.debug("SHA-256 hash calculated and file stored: hash={}, file={}, original={}",
                 hexHash, storedFileName, originalFilename);
 
@@ -550,7 +554,7 @@ public class FileStorageService {
     /**
      * Calculate SHA-256 hash of byte array.
      * Used for integrity verification when retrieving files.
-     * 
+     *
      * @param data Byte array to hash
      * @return SHA-256 hash as hex string (64 characters)
      * @throws FileUploadException If hashing fails
@@ -568,17 +572,17 @@ public class FileStorageService {
     /**
      * Create UploadResponse DTO from File entity.
      * Encapsulates response data with essential metadata.
-     * 
+     *
      * @param file File entity to convert
      * @return UploadResponse DTO
      */
     private UploadResponse createUploadResponse(File file) {
         return new UploadResponse(
-            file.getId(),
-            file.getSha256Hash(),
-            file.getFileSize(),
-            file.getUploadedAt(),
-            file.getMimeType()
+                file.getId(),
+                file.getSha256Hash(),
+                file.getFileSize(),
+                file.getUploadedAt(),
+                file.getMimeType()
         );
     }
 

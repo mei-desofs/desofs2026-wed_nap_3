@@ -15,14 +15,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import pt.isep.desofs.enderchest.entity.Folder;
-import pt.isep.desofs.enderchest.repository.FolderRepository;
+import pt.isep.desofs.enderchest.exception.resource.FolderNotFoundException;
+import pt.isep.desofs.enderchest.exception.resource.InvalidFolderNameException;
 import pt.isep.desofs.enderchest.service.FolderService;
 import pt.isep.desofs.enderchest.service.dto.FolderDeleteResponse;
 import pt.isep.desofs.enderchest.service.dto.FolderRequest;
 import pt.isep.desofs.enderchest.service.dto.FolderResponse;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -62,7 +62,6 @@ import java.util.stream.Collectors;
 public class FolderController {
 
     private final FolderService folderService;
-    private final FolderRepository folderRepository;
 
     /**
      * Create a new folder.
@@ -196,18 +195,8 @@ public class FolderController {
 
         log.info("Folder listing initiated by user: {} with parentId: {}", userId, parentId);
 
-        // Convert userId to UUID
-        UUID userIdUuid = UUID.fromString(userId);
-
-        // Query folders based on parent ID
-        List<Folder> folders;
-        if (parentId == null) {
-            // Get root-level folders for this user
-            folders = folderRepository.findByOwnerIdAndParentFolderIdNullAndIsDeletedFalse(userIdUuid);
-        } else {
-            // Get child folders of the specified parent
-            folders = folderRepository.findByOwnerIdAndParentFolderIdAndIsDeletedFalse(userIdUuid, parentId);
-        }
+        // Call service to get folders
+        List<Folder> folders = folderService.listFolders(parentId);
 
         log.info("Found {} folders for user: {} with parentId: {}", folders.size(), userId, parentId);
 
@@ -272,34 +261,32 @@ public class FolderController {
 
         log.info("Folder retrieval initiated by user: {} for folderId: {}", userId, folderId);
 
-        // Retrieve folder from database
-        Optional<Folder> folderOptional = folderRepository.findById(folderId);
+        try {
+            // Retrieve folder from service
+            Folder folder = folderService.getFolderByIdOrThrow(folderId);
 
-        if (folderOptional.isEmpty()) {
+            // Check if folder is deleted
+            if (!folder.isActive()) {
+                log.warn("Folder has been deleted. FolderId: {}", folderId);
+                return ResponseEntity.status(HttpStatus.GONE).build();
+            }
+
+            log.info("Folder retrieved successfully. FolderId: {}, Name: {}", folderId, folder.getFolderName());
+
+            // Build response
+            FolderResponse response = new FolderResponse(
+                    folder.getFolderId(),
+                    folder.getFolderName(),
+                    folder.getParentFolderId(),
+                    (long) folder.getChildFolders().size(), // childCount
+                    folder.isActive()
+            );
+
+            return ResponseEntity.ok(response);
+        } catch (FolderNotFoundException ex) {
             log.warn("Folder not found. FolderId: {}", folderId);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+            throw ex; // Let the global exception handler convert to 404
         }
-
-        Folder folder = folderOptional.get();
-
-        // Check if folder is deleted
-        if (!folder.isActive()) {
-            log.warn("Folder has been deleted. FolderId: {}", folderId);
-            return ResponseEntity.status(HttpStatus.GONE).build();
-        }
-
-        log.info("Folder retrieved successfully. FolderId: {}, Name: {}", folderId, folder.getFolderName());
-
-        // Build response
-        FolderResponse response = new FolderResponse(
-                folder.getFolderId(),
-                folder.getFolderName(),
-                folder.getParentFolderId(),
-                (long) folder.getChildFolders().size(), // childCount
-                folder.isActive()
-        );
-
-        return ResponseEntity.ok(response);
     }
 
     /**
@@ -358,38 +345,29 @@ public class FolderController {
 
         log.info("Folder update initiated by user: {} for folderId: {} with name: {}", userId, folderId, request.getFolderName());
 
-        // Retrieve folder from database
-        Optional<Folder> folderOptional = folderRepository.findById(folderId);
+        try {
+            // Call service to rename folder
+            Folder folder = folderService.renameFolder(folderId, request.getFolderName());
 
-        if (folderOptional.isEmpty()) {
+            log.info("Folder updated successfully. FolderId: {}, NewName: {}", folderId, folder.getFolderName());
+
+            // Build response
+            FolderResponse response = new FolderResponse(
+                    folder.getFolderId(),
+                    folder.getFolderName(),
+                    folder.getParentFolderId(),
+                    (long) folder.getChildFolders().size(), // childCount
+                    folder.isActive()
+            );
+
+            return ResponseEntity.ok(response);
+        } catch (FolderNotFoundException ex) {
             log.warn("Folder not found for update. FolderId: {}", folderId);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+            throw ex; // Let the global exception handler convert to 404
+        } catch (InvalidFolderNameException ex) {
+            log.warn("Invalid folder name for update. FolderId: {}, Name: {}", folderId, request.getFolderName());
+            throw ex; // Let the global exception handler convert to 400
         }
-
-        Folder folder = folderOptional.get();
-
-        // Check if folder is deleted
-        if (!folder.isActive()) {
-            log.warn("Cannot update deleted folder. FolderId: {}", folderId);
-            return ResponseEntity.status(HttpStatus.GONE).build();
-        }
-
-        // Update folder name
-        folder.setFolderName(request.getFolderName());
-        folderRepository.save(folder);
-
-        log.info("Folder updated successfully. FolderId: {}, NewName: {}", folderId, folder.getFolderName());
-
-        // Build response
-        FolderResponse response = new FolderResponse(
-                folder.getFolderId(),
-                folder.getFolderName(),
-                folder.getParentFolderId(),
-                (long) folder.getChildFolders().size(), // childCount
-                folder.isActive()
-        );
-
-        return ResponseEntity.ok(response);
     }
 
     /**
@@ -443,34 +421,25 @@ public class FolderController {
 
         log.info("Folder deletion initiated by user: {} for folderId: {}", userId, folderId);
 
-        // Retrieve folder from database
-        Optional<Folder> folderOptional = folderRepository.findById(folderId);
+        try {
+            // Call service to soft delete folder
+            folderService.softDeleteFolder(folderId);
 
-        if (folderOptional.isEmpty()) {
+            // Retrieve the deleted folder to get deletion timestamp
+            Folder deletedFolder = folderService.getFolderByIdOrThrow(folderId);
+
+            log.info("Folder deleted successfully. FolderId: {}, DeletedAt: {}", folderId, deletedFolder.getDeletedAt());
+
+            FolderDeleteResponse response = new FolderDeleteResponse(
+                    folderId,
+                    deletedFolder.getDeletedAt(),
+                    "Folder deleted successfully"
+            );
+
+            return ResponseEntity.ok(response);
+        } catch (FolderNotFoundException ex) {
             log.warn("Folder not found for deletion. FolderId: {}", folderId);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+            throw ex; // Let the global exception handler convert to 404
         }
-
-        Folder folder = folderOptional.get();
-
-        // Check if already deleted
-        if (!folder.isActive()) {
-            log.warn("Folder already deleted. FolderId: {}", folderId);
-            return ResponseEntity.status(HttpStatus.GONE).build();
-        }
-
-        // Perform soft delete
-        folder.softDelete();
-        folderRepository.save(folder);
-
-        log.info("Folder deleted successfully. FolderId: {}, DeletedAt: {}", folderId, folder.getDeletedAt());
-
-        FolderDeleteResponse response = new FolderDeleteResponse(
-                folderId,
-                folder.getDeletedAt(),
-                "Folder deleted successfully"
-        );
-
-        return ResponseEntity.ok(response);
     }
 }
