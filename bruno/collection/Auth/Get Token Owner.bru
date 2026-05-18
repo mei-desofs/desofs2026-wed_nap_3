@@ -1,0 +1,33 @@
+meta {
+  name: Get Token Owner
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{auth0_domain}}/oauth/token
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "client_id": "{{client_id}}",
+    "client_secret": "{{client_secret}}",
+    "audience": "{{audience}}",
+    "grant_type": "password",
+    "username": "owner@test.com",
+    "password": "N34W@4ACSyCcy@D"
+  }
+}
+
+script:post-response {
+  if (res.status === 200) {
+    bru.setVar("token", res.body.access_token);
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

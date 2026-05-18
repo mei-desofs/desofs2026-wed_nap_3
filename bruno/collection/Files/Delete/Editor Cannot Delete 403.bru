@@ -1,0 +1,24 @@
+meta {
+  name: Editor Cannot Delete 403
+  type: http
+  seq: 2
+}
+
+delete {
+  url: {{base_url}}/api/v1/files/{{last_file_id}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  ST-07 — RBAC: EDITOR não pode apagar ficheiros.
+  
+  Usar token de EDITOR (Get Token Editor).
+  Expected: 403 Forbidden
+  
+  Mitigates: SDR-02 (RBAC), T-09 (Role Abuse — AC-07)
+}

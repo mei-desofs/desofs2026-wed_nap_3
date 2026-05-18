@@ -1,0 +1,30 @@
+meta {
+  name: Block Shell Script Upload
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{base_url}}/api/v1/files/upload
+  body: multipart-form
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:multipart-form {
+  file: @file(test-files/exploit.sh)
+}
+
+docs {
+  ST-03 — Block shell script upload
+  
+  Expected: 415 Unsupported Media Type (InvalidFileTypeException)
+  
+  Ficheiro necessário: test-files/exploit.sh
+  (Criar com: echo "#!/bin/bash" > test-files/exploit.sh)
+  
+  Mitigates: SDR-05 (MIME validation), T-06, AC-03
+}

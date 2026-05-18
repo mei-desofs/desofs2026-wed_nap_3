@@ -1,0 +1,28 @@
+meta {
+  name: Delete File Owner
+  type: http
+  seq: 1
+}
+
+delete {
+  url: {{base_url}}/api/v1/files/{{last_file_id}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+vars:pre-request {
+  last_file_id: 9d3f5a4f-2a98-4128-aa6c-52fb5cba9d66
+}
+
+docs {
+  Delete de ficheiro — apenas OWNER pode apagar.
+  
+  Usar token de OWNER (Get Token Owner).
+  Expected: 200 OK com confirmação de soft delete.
+  
+  Mitigates: SDR-02 (RBAC), T-09 (Role Abuse — EDITOR não pode apagar)
+}

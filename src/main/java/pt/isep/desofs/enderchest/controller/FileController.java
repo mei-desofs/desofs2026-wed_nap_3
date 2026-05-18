@@ -124,7 +124,6 @@ public class FileController {
      * IDOR prevention checks (AC-04 / ST-02) before returning the file.
      */
     @GetMapping("/{fileId}")
-    @Transactional(readOnly = true)
     @PreAuthorize("hasAuthority('ROLE_OWNER') or hasAuthority('ROLE_EDITOR') or hasAuthority('ROLE_VIEWER')")
     @Operation(summary = "Download a file", description = "Download a file by ID with SHA-256 integrity verification")
     @ApiResponses(value = {
@@ -139,14 +138,15 @@ public class FileController {
             @PathVariable UUID fileId,
             @AuthenticationPrincipal Jwt jwt) {
 
-        // Extract email from JWT to verify caller identity
-        String callerEmail = jwt.getClaimAsString("email");
+        // Extract userId from JWT subject — never trust client-supplied headers
+        String userId = jwt.getSubject();
+        String email = jwt.getClaimAsString("email");
 
-        log.info("File download initiated by user: {} for fileId: {}", callerEmail, fileId);
+        log.info("File download initiated by user: {} for fileId: {}", userId, fileId);
 
         try {
             // Delegate to FileService for access control and file retrieval
-            File file = fileService.downloadFile(fileId, callerEmail);
+            File file = fileService.downloadFile(fileId, userId, email);
 
             // Construct file path and load resource
             Path filePath = Paths.get(file.getStorageLocation());
@@ -175,7 +175,7 @@ public class FileController {
             log.warn("File not found: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         } catch (FileAccessDeniedException e) {
-            log.warn("IDOR attempt blocked: user {} attempted to access file {} without permission", callerEmail, fileId);
+            log.warn("IDOR attempt blocked: user {} attempted to access file {} without permission", userId, fileId);
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         } catch (MalformedURLException e) {
             log.error("Invalid file URL. FileId: {}", fileId, e);
@@ -191,7 +191,6 @@ public class FileController {
      * IDOR prevention checks (AC-04 / ST-02) before deletion.
      */
     @DeleteMapping("/{fileId}")
-    @Transactional
     @PreAuthorize("hasAuthority('ROLE_OWNER')")
     @Operation(summary = "Soft delete a file", description = "Mark a file as deleted without removing from storage or database")
     @ApiResponses(value = {
@@ -208,15 +207,16 @@ public class FileController {
             UUID fileId,
             @AuthenticationPrincipal Jwt jwt) {
 
-        // Extract email from JWT to verify caller identity
-        String callerEmail = jwt.getClaimAsString("email");
+        // Extract userId from JWT subject — never trust client-supplied headers
+        String userId = jwt.getSubject();
+        String email = jwt.getClaimAsString("email");
 
-        log.info("File deletion initiated by user: {} for fileId: {}", callerEmail, fileId);
+        log.info("File deletion initiated by user: {} for fileId: {}", userId, fileId);
 
         try {
             // Delegate to FileService for access control and deletion
             // FileService.deleteFile() handles all access checks and performs the soft delete
-            fileService.deleteFile(fileId, callerEmail);
+            fileService.deleteFile(fileId, userId, email);
 
             // Build success response with current timestamp
             FileDeleteResponse response = new FileDeleteResponse(
@@ -232,7 +232,7 @@ public class FileController {
             log.warn("File not found: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         } catch (FileAccessDeniedException e) {
-            log.warn("IDOR attempt blocked: user {} attempted to delete file {} without ownership", callerEmail, fileId);
+            log.warn("IDOR attempt blocked: user {} attempted to delete file {} without ownership", userId, fileId);
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
     }

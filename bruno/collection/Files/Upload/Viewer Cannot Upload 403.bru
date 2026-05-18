@@ -1,0 +1,28 @@
+meta {
+  name: Viewer Cannot Upload 403
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{base_url}}/api/v1/files/upload
+  body: multipartForm
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:multipart-form {
+  file: @file(/Users/ctw04298/Downloads/7AioCwAAAAZJREFUAwDs9AMt9vRBVAAAAABJRU5ErkJggg.png)
+}
+
+docs {
+  ST-07 — RBAC: VIEWER não pode fazer upload.
+  
+  Usar token de VIEWER (Get Token Viewer).
+  Expected: 403 Forbidden
+  
+  Mitigates: SDR-02 (RBAC), T-09 (Role Abuse)
+}
