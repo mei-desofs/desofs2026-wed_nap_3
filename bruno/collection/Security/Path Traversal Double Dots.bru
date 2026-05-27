@@ -1,0 +1,33 @@
+meta {
+  name: Path Traversal Double Dots
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/api/v1/files/upload
+  body: multipart-form
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:multipart-form {
+  file: @file(test-files/document.pdf); filename="../../etc/passwd"
+}
+
+docs {
+  ST-01 — Path Traversal Prevention (T-05, AC-01)
+  
+  Tenta fazer upload com um nome de ficheiro contendo ".." para escapar
+  da directoria base de armazenamento.
+  
+  Expected: 400 Bad Request (PathTraversalAttemptException)
+  
+  Usar token de OWNER ou EDITOR.
+  Ficheiro necessário: test-files/document.pdf
+  
+  Mitigates: SDR-04 (Path Traversal), T-05, AC-01
+}

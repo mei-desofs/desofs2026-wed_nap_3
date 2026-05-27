@@ -1,0 +1,44 @@
+meta {
+  name: Hash Verification SHA256
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{base_url}}/api/v1/files/upload
+  body: multipart-form
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:multipart-form {
+  file: @file(test-files/document.pdf)
+}
+
+script:after-response {
+  if (res.status === 201) {
+    const hash = res.body.sha256Hash;
+    if (hash && hash.length === 64 && /^[0-9a-f]+$/.test(hash)) {
+      console.log("SHA-256 hash válido: " + hash);
+    } else {
+      console.error("SHA-256 hash inválido ou em falta: " + hash);
+    }
+  }
+}
+
+docs {
+  ST-12 — SHA-256 Hash Verification (SDR-NEW-11)
+  
+  Verifica que a resposta inclui um SHA-256 hash válido:
+  - 64 caracteres hexadecimais
+  - Formato: [0-9a-f]{64}
+  
+  Expected: 201 Created com sha256Hash de 64 caracteres hex.
+  
+  O script verifica automaticamente o formato do hash.
+  
+  Mitigates: SDR-NEW-11 (FileHash integrity), T-17 (File Tampering)
+}

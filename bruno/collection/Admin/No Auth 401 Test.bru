@@ -1,0 +1,16 @@
+meta {
+  name: No Auth 401 Test
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{base_url}}/api/v1/files/admin/health
+  body: none
+  auth: none
+}
+
+docs {
+  ST-07-05 — Unauthenticated access must always return 401 Unauthorized.
+  No token is sent in this request.
+}

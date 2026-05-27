@@ -1,0 +1,34 @@
+meta {
+  name: Download File
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{base_url}}/api/v1/files/{{last_file_id}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+vars:pre-request {
+  last_file_id: 9d3f5a4f-2a98-4128-aa6c-52fb5cba9d66
+}
+
+docs {
+  Download de ficheiro por ID.
+  
+  Usa o {{last_file_id}} guardado após o upload.
+  Se não tiver fileId, substitui manualmente no URL.
+  
+  Expected:
+  - OWNER  → 200 OK (ficheiro pertence ao utilizador)
+  - EDITOR → 200 OK (se tiver acesso)
+  - VIEWER → 200 OK (se tiver acesso)
+  - No token → 401 Unauthorized
+  
+  Nota: retorna 403 se o utilizador não tiver AccessShare para o ficheiro.
+}

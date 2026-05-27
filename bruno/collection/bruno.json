@@ -1,14 +1,5 @@
-meta {
-  name: EnderChest File Storage API
-  type: collection
-  seq: 1
-}
-
-auth {
-  bearer: {{bearer_token}}
-}
-
-vars {
-  base_url: http://localhost:8080
-  bearer_token: test-token
+{
+  "version": "1",
+  "name": "EnderChest File Storage API",
+  "type": "collection"
 }

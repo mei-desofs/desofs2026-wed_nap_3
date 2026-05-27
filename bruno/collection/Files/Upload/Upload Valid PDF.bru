@@ -1,0 +1,42 @@
+meta {
+  name: Upload Valid PDF
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/api/v1/files/upload
+  body: multipart-form
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:multipart-form {
+  file: @file(test-files/document.pdf)
+}
+
+script:after-response {
+  if (res.status === 201 && res.body.fileId) {
+    bru.setVar("last_file_id", res.body.fileId);
+    console.log("File ID saved: " + res.body.fileId);
+  }
+}
+
+docs {
+  ST-01, ST-03 — Upload de ficheiro PDF válido.
+  
+  Expected: 201 Created com fileId e sha256Hash.
+  
+  Roles:
+  - OWNER  → 201 Created
+  - EDITOR → 201 Created
+  - VIEWER → 403 Forbidden
+  - No token → 401 Unauthorized
+  
+  O fileId é guardado em {{last_file_id}} para usar nos requests de download/delete.
+  
+  Ficheiro necessário: test-files/document.pdf
+}

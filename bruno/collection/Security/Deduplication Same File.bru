@@ -1,0 +1,34 @@
+meta {
+  name: Deduplication Same File
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{base_url}}/api/v1/files/upload
+  body: multipart-form
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:multipart-form {
+  file: @file(test-files/document.pdf)
+}
+
+docs {
+  Deduplication — upload do mesmo ficheiro duas vezes.
+  
+  Corre este request duas vezes seguidas com o mesmo ficheiro.
+  Na segunda execução, o sistema deve devolver o mesmo fileId
+  (deduplicação por SHA-256 hash).
+  
+  Expected (1ª vez): 201 Created com novo fileId
+  Expected (2ª vez): 201 Created com o MESMO fileId (deduplicado)
+  
+  Verifica que o sha256Hash é idêntico nas duas respostas.
+  
+  Mitigates: SDR-NEW-11 (SHA-256 FileHash integrity)
+}

@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import pt.isep.desofs.enderchest.exception.resource.CircularReferenceFolderException;
+import pt.isep.desofs.enderchest.exception.resource.FileNotFoundException;
+import pt.isep.desofs.enderchest.exception.security.FileAccessDeniedException;
 import pt.isep.desofs.enderchest.exception.resource.FolderNotFoundException;
 import pt.isep.desofs.enderchest.exception.resource.InvalidFolderNameException;
 import pt.isep.desofs.enderchest.exception.resource.StorageQuotaExceededException;
@@ -334,6 +336,38 @@ public class ApiExceptionHandler {
      * @param ex Exception
      * @return ResponseEntity with generic error message
      */
+    @ExceptionHandler(FileNotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ResponseEntity<Map<String, Object>> handleFileNotFound(
+            FileNotFoundException ex) {
+
+        Map<String, Object> error = new HashMap<>();
+        error.put("timestamp", LocalDateTime.now());
+        error.put("status", HttpStatus.NOT_FOUND.value());
+        error.put("error", "Not Found");
+        error.put("message", ex.getMessage());
+
+        log.warn("File not found: {}", ex.getMessage());
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+    }
+
+    @ExceptionHandler(FileAccessDeniedException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ResponseEntity<Map<String, Object>> handleFileAccessDenied(
+            FileAccessDeniedException ex) {
+
+        Map<String, Object> error = new HashMap<>();
+        error.put("timestamp", LocalDateTime.now());
+        error.put("status", HttpStatus.FORBIDDEN.value());
+        error.put("error", "Forbidden");
+        error.put("message", "Access denied");
+
+        log.warn("File access denied: {}", ex.getMessage());
+
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+    }
+
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ResponseEntity<Map<String, Object>> handleGenericException(

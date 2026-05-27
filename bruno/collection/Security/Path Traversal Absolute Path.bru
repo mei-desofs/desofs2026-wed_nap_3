@@ -1,0 +1,29 @@
+meta {
+  name: Path Traversal Absolute Path
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/api/v1/files/upload
+  body: multipart-form
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:multipart-form {
+  file: @file(test-files/document.pdf); filename="/etc/passwd"
+}
+
+docs {
+  ST-01 — Path Traversal Prevention (caminho absoluto)
+  
+  Tenta fazer upload com um caminho absoluto como nome de ficheiro.
+  
+  Expected: 400 Bad Request (PathTraversalAttemptException)
+  
+  Mitigates: SDR-04 (Path Traversal), T-05, AC-01
+}
