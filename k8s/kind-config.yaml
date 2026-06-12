@@ -1,0 +1,21 @@
+# Kind cluster configuration with port mappings for external access
+# vs-gate.dei.isep.ipp.pt:10581 (HTTPS terminated) → VM port 80 → Kind node port 80
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    extraPortMappings:
+      # HTTP: maps host port 80 → container port 80 (Traefik entrypoint)
+      - containerPort: 80
+        hostPort: 80
+        protocol: TCP
+      # Additional port for vs-gate:30581 → host 8080
+      - containerPort: 8080
+        hostPort: 8080
+        protocol: TCP
