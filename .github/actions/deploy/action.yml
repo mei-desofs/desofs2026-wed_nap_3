@@ -24,13 +24,13 @@ runs:
         app-id: ${{ inputs.app-id }}
         private-key: ${{ inputs.app-private-key }}
 
-    # ─── Log in to GHCR ───
+    # ─── Log in to GHCR (use GITHUB_TOKEN for push) ───
     - name: Log in to GitHub Container Registry
       uses: docker/login-action@v3
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
-        password: ${{ steps.app-token.outputs.token }}
+        password: ${{ github.token }}
 
     # ─── Build and push Docker image ───
     - name: Build and push Docker image
@@ -47,10 +47,12 @@ runs:
     - name: Package and push Helm chart
       shell: bash
       run: |
-        echo "${{ steps.app-token.outputs.token }}" | helm registry login ghcr.io --username ${{ github.actor }} --password-stdin
+        echo "${{ github.token }}" | helm registry login ghcr.io \
+          --username ${{ github.actor }} --password-stdin
         helm package ./helm-chart --version 0.1.${{ github.run_number }}
-        helm push enderchest-0.1.${{ github.run_number }}.tgz oci://ghcr.io/mei-desofs/desofs2026-wed_nap_3/charts
-
+        helm push enderchest-0.1.${{ github.run_number }}.tgz \
+          oci://ghcr.io/mei-desofs/desofs2026-wed_nap_3/charts
+          
     # ─── Deploy to remote VM via SSH ───
     - name: Deploy to Kind cluster via SSH
       uses: appleboy/ssh-action@v1
