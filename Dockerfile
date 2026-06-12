@@ -8,6 +8,8 @@ RUN mvn clean package -DskipTests
 
 FROM eclipse-temurin:21-jre-alpine
 
+RUN apk upgrade --no-cache libcrypto3 libssl3 openssl
+
 WORKDIR /app
 COPY --from=builder /build/target/*.jar app.jar
 
