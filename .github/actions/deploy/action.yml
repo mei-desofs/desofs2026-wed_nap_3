@@ -53,14 +53,21 @@ runs:
         helm push enderchest-0.1.${{ github.run_number }}.tgz \
           oci://ghcr.io/mei-desofs/desofs2026-wed_nap_3/charts
           
-    # ─── Deploy to remote VM via SSH ───
+    - name: Write SSH key to file
+      shell: bash
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ inputs.ssh-private-key }}" > ~/.ssh/id_ed25519
+        chmod 600 ~/.ssh/id_ed25519
+    
     - name: Deploy to Kind cluster via SSH
       uses: appleboy/ssh-action@v1
       with:
         host: vsgate-ssh.dei.isep.ipp.pt
         username: root
         port: 10581
-        key: ${{ inputs.ssh-private-key }}
+        key_path: ~/.ssh/id_ed25519
+        timeout: 60s
         envs: APP_TOKEN,IMAGE_TAG,CHART_VERSION,GITHUB_ACTOR
         script: |
           set -e
