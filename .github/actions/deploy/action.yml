@@ -1,6 +1,5 @@
-# Composite Action: Build, push to GHCR, and deploy to Kind cluster via SSH
 name: "Deploy Ender Chest"
-description: "Builds Docker image, pushes to GHCR, packages Helm chart, and deploys to remote Kind cluster"
+description: "Builds Docker image, pushes to GHCR, and deploys to DEI VS with Docker Compose"
 
 inputs:
   app-id:
@@ -10,13 +9,12 @@ inputs:
     description: "GitHub App private key (PEM)"
     required: true
   ssh-private-key:
-    description: "SSH private key for remote VM"
+    description: "SSH private key for DEI VM"
     required: true
 
 runs:
   using: "composite"
   steps:
-    # ─── Generate short-lived GitHub App token ───
     - name: Generate GitHub App token
       id: app-token
       uses: actions/create-github-app-token@v1
@@ -24,7 +22,6 @@ runs:
         app-id: ${{ inputs.app-id }}
         private-key: ${{ inputs.app-private-key }}
 
-    # ─── Log in to GHCR (use GITHUB_TOKEN for push) ───
     - name: Log in to GitHub Container Registry
       uses: docker/login-action@v3
       with:
@@ -32,78 +29,44 @@ runs:
         username: ${{ github.actor }}
         password: ${{ github.token }}
 
-    # ─── Build and push Docker image ───
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
       with:
         context: .
         push: true
-        tags: ghcr.io/mei-desofs/desofs2026-wed_nap_3/ender-chest:${{ github.sha }}
+        tags: |
+          ghcr.io/mei-desofs/desofs2026-wed_nap_3/ender-chest:${{ github.sha }}
+          ghcr.io/mei-desofs/desofs2026-wed_nap_3/ender-chest:latest
 
-    # ─── Package and push Helm chart ───
-    - name: Set up Helm
-      uses: azure/setup-helm@v4
-
-    - name: Package and push Helm chart
-      shell: bash
-      run: |
-        echo "${{ github.token }}" | helm registry login ghcr.io \
-          --username ${{ github.actor }} --password-stdin
-        helm package ./helm-chart --version 0.1.${{ github.run_number }}
-        helm push enderchest-0.1.${{ github.run_number }}.tgz \
-          oci://ghcr.io/mei-desofs/desofs2026-wed_nap_3/charts
-
-    # ─── Write SSH key to file ───
     - name: Write SSH key to file
       shell: bash
       run: |
         echo "${{ inputs.ssh-private-key }}" > /tmp/id_ed25519
         chmod 600 /tmp/id_ed25519
 
-    # ─── Set deploy environment variables ───
     - name: Set deploy env vars
       shell: bash
       run: |
         echo "APP_TOKEN=${{ github.token }}" >> $GITHUB_ENV
         echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_ENV
-        echo "CHART_VERSION=${{ github.run_number }}" >> $GITHUB_ENV
         echo "GITHUB_ACTOR=${{ github.actor }}" >> $GITHUB_ENV
 
-    # ─── Deploy to Kind cluster via SSH ───
-    - name: Deploy to Kind cluster via SSH
+    - name: Deploy via SSH
       uses: appleboy/ssh-action@v1
       with:
         host: vsgate-ssh.dei.isep.ipp.pt
         username: root
         port: 10581
         key_path: /tmp/id_ed25519
-        timeout: 60s
-        command_timeout: 30m
-        envs: APP_TOKEN,IMAGE_TAG,CHART_VERSION,GITHUB_ACTOR
+        timeout: 30s
+        command_timeout: 5m
+        envs: APP_TOKEN,IMAGE_TAG,GITHUB_ACTOR
         script: |
           set -e
-          export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-        
-          # Install k3s if not already installed
-          if ! command -v k3s &> /dev/null; then
-            curl -sfL https://get.k3s.io | sh -
-            sleep 10
-          fi
-        
-          # Refresh GHCR pull secret
-          kubectl create secret docker-registry ghcr-secret \
-            --docker-server=ghcr.io \
-            --docker-username="${GITHUB_ACTOR}" \
-            --docker-password="${APP_TOKEN}" \
-            --dry-run=client -o yaml | kubectl apply -f -
-        
-          # Log Helm into GHCR
-          echo "${APP_TOKEN}" | helm registry login ghcr.io --username "${GITHUB_ACTOR}" --password-stdin
-        
-          # Deploy with Helm
-          helm upgrade --install ender-chest \
-            oci://ghcr.io/mei-desofs/desofs2026-wed_nap_3/charts/enderchest \
-            --version "0.1.${CHART_VERSION}" \
-            --set image.repository=ghcr.io/mei-desofs/desofs2026-wed_nap_3/ender-chest \
-            --set image.tag="${IMAGE_TAG}" \
-            --set imagePullSecrets[0].name=ghcr-secret \
+
+          echo "${APP_TOKEN}" | docker login ghcr.io --username "${GITHUB_ACTOR}" --password-stdin
+
+          sed -i "s|ender-chest:.*|ender-chest:${IMAGE_TAG}|" /root/docker-compose.yml
+
+          docker compose -f /root/docker-compose.yml pull app
+          docker compose -f /root/docker-compose.yml up -d
