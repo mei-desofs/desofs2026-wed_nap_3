@@ -17,7 +17,7 @@ ingress:
   annotations:
     traefik.ingress.kubernetes.io/router.entrypoints: web
   hosts:
-    - host: vs-gate.dei.isep.ipp.pt
+    - host: 172.160.228.21
       paths:
         - path: /
           pathType: Prefix
