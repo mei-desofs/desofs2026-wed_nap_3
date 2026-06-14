@@ -78,17 +78,10 @@ runs:
         port: 10581
         key_path: /tmp/id_ed25519
         timeout: 60s
+        command_timeout: 30m
         envs: APP_TOKEN,IMAGE_TAG,CHART_VERSION,GITHUB_ACTOR
         script: |
           set -e
-
-          # Refresh GHCR pull secret
-          kubectl create secret docker-registry ghcr-secret \
-            --docker-server=ghcr.io \
-            --docker-username="${GITHUB_ACTOR}" \
-            --docker-password="${APP_TOKEN}" \
-            --dry-run=client -o yaml | kubectl apply -f -
-
           # Ensure Kind cluster exists (with port mappings for ingress)
           if ! kind get clusters 2>/dev/null | grep -q "^ender-chest$"; then
             echo "Creating Kind cluster 'ender-chest' with ingress port mappings..."
@@ -130,7 +123,14 @@ runs:
           else
             echo "Kind cluster 'ender-chest' already exists."
           fi
-
+          
+           # Refresh GHCR pull secret
+          kubectl create secret docker-registry ghcr-secret \
+            --docker-server=ghcr.io \
+            --docker-username="${GITHUB_ACTOR}" \
+            --docker-password="${APP_TOKEN}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+            
           # Log Helm into GHCR
           echo "${APP_TOKEN}" | helm registry login ghcr.io --username "${GITHUB_ACTOR}" --password-stdin
 
@@ -141,3 +141,4 @@ runs:
             --set image.repository=ghcr.io/mei-desofs/desofs2026-wed_nap_3/ender-chest \
             --set image.tag="${IMAGE_TAG}" \
             --set imagePullSecrets[0].name=ghcr-secret
+            --wait=false
