@@ -56,9 +56,9 @@ runs:
     - name: Write SSH key to file
       shell: bash
       run: |
-        mkdir -p ~/.ssh
-        echo "${{ inputs.ssh-private-key }}" > ~/.ssh/id_ed25519
-        chmod 600 ~/.ssh/id_ed25519
+        mkdir -p /root/.ssh
+        echo "${{ inputs.ssh-private-key }}" > /root/.ssh/id_ed25519
+        chmod 600 /root/.ssh/id_ed25519
     
     - name: Deploy to Kind cluster via SSH
       uses: appleboy/ssh-action@v1
@@ -66,7 +66,7 @@ runs:
         host: vsgate-ssh.dei.isep.ipp.pt
         username: root
         port: 10581
-        key_path: ~/.ssh/id_ed25519
+        key_path: /root/.ssh/id_ed25519
         timeout: 60s
         envs: APP_TOKEN,IMAGE_TAG,CHART_VERSION,GITHUB_ACTOR
         script: |
