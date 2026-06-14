@@ -52,13 +52,24 @@ runs:
         helm package ./helm-chart --version 0.1.${{ github.run_number }}
         helm push enderchest-0.1.${{ github.run_number }}.tgz \
           oci://ghcr.io/mei-desofs/desofs2026-wed_nap_3/charts
-          
+
+    # ─── Write SSH key to file ───
     - name: Write SSH key to file
       shell: bash
       run: |
         echo "${{ inputs.ssh-private-key }}" > /tmp/id_ed25519
         chmod 600 /tmp/id_ed25519
-    
+
+    # ─── Set deploy environment variables ───
+    - name: Set deploy env vars
+      shell: bash
+      run: |
+        echo "APP_TOKEN=${{ steps.app-token.outputs.token }}" >> $GITHUB_ENV
+        echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_ENV
+        echo "CHART_VERSION=${{ github.run_number }}" >> $GITHUB_ENV
+        echo "GITHUB_ACTOR=${{ github.actor }}" >> $GITHUB_ENV
+
+    # ─── Deploy to Kind cluster via SSH ───
     - name: Deploy to Kind cluster via SSH
       uses: appleboy/ssh-action@v1
       with:
@@ -82,7 +93,6 @@ runs:
           if ! kind get clusters 2>/dev/null | grep -q "^ender-chest$"; then
             echo "Creating Kind cluster 'ender-chest' with ingress port mappings..."
 
-            # Write Kind config inline (the k8s/kind-config.yaml from the repo)
             cat <<'EOF' > /tmp/kind-config.yaml
           kind: Cluster
           apiVersion: kind.x-k8s.io/v1alpha4
@@ -131,8 +141,3 @@ runs:
             --set image.repository=ghcr.io/mei-desofs/desofs2026-wed_nap_3/ender-chest \
             --set image.tag="${IMAGE_TAG}" \
             --set imagePullSecrets[0].name=ghcr-secret
-      env:
-        APP_TOKEN: ${{ steps.app-token.outputs.token }}
-        IMAGE_TAG: ${{ github.sha }}
-        CHART_VERSION: ${{ github.run_number }}
-        GITHUB_ACTOR: ${{ github.actor }}
