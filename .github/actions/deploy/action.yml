@@ -141,4 +141,3 @@ runs:
             --set image.repository=ghcr.io/mei-desofs/desofs2026-wed_nap_3/ender-chest \
             --set image.tag="${IMAGE_TAG}" \
             --set imagePullSecrets[0].name=ghcr-secret
-            --wait=false
