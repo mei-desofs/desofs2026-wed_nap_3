@@ -64,7 +64,7 @@ runs:
     - name: Set deploy env vars
       shell: bash
       run: |
-        echo "APP_TOKEN=${{ steps.app-token.outputs.token }}" >> $GITHUB_ENV
+        echo "APP_TOKEN=${{ github.token }}" >> $GITHUB_ENV
         echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_ENV
         echo "CHART_VERSION=${{ github.run_number }}" >> $GITHUB_ENV
         echo "GITHUB_ACTOR=${{ github.actor }}" >> $GITHUB_ENV
