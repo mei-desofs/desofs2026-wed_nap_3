@@ -249,22 +249,24 @@ jobs:
           retention-days: 30
 
   # ──────────────────────────────────────────────────────────────
-  # Job 7: Deploy to K3s cluster.
-  # Only runs on pushes to main (not PRs) after all security and
-  # validation jobs pass. Builds the Docker image, pushes to GHCR,
-  # packages the Helm chart, and deploys via SSH to the Azure VM.
+  # Job 7: Deploy — only on main, after all checks pass.
+  # Builds Docker image, pushes to GHCR, packages Helm chart,
+  # and deploys to a remote Kind cluster via SSH.
   # ──────────────────────────────────────────────────────────────
   deploy:
-    name: Deploy
+    name: Deploy to Kind cluster
     runs-on: ubuntu-latest
-    needs: [sca, sonar, trivy, helm-validate, dast]
+    needs: [build-and-test, sca, sonar, trivy, dast, helm-validate]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Deploy to K3s
+      - name: Deploy Ender Chest
         uses: ./.github/actions/deploy
         with:
           app-id: ${{ secrets.APP_ID }}
