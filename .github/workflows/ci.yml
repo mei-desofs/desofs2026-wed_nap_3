@@ -229,8 +229,10 @@ jobs:
 
       - name: Run OWASP ZAP API scan
         run: |
+          mkdir -p zap-output
+          chmod 777 zap-output
           docker run --network host \
-            -v $(pwd):/zap/wrk/:rw \
+            -v $(pwd)/zap-output:/zap/wrk/:rw \
             ghcr.io/zaproxy/zaproxy:stable \
             zap-api-scan.py \
               -t http://localhost:8080/v3/api-docs \
@@ -243,7 +245,7 @@ jobs:
         if: always()
         with:
           name: zap-dast-report
-          path: zap-report.html
+          path: zap-output/zap-report.html
           retention-days: 30
 
   # ──────────────────────────────────────────────────────────────
