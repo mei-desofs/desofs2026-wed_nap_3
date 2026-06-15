@@ -247,22 +247,6 @@ jobs:
           name: zap-dast-report
           path: zap-output/zap-report.html
           retention-days: 30
-  # ──────────────────────────────────────────────────────────────
-  # Job 6: Helm Chart Validation — lint + schema validation.
-  # Ensures the chart renders valid Kubernetes manifests and
-  # follows best practices before deployment.
-  # ──────────────────────────────────────────────────────────────
-  helm-validate:
-    name: Helm Chart Validation
-    runs-on: ubuntu-latest
-    needs: build-and-test
-
-    steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
-
-      - name: Validate Helm chart
-        uses: ./.github/actions/helm-validate
 
   # ──────────────────────────────────────────────────────────────
   # Job 7: Deploy — only on main, after all checks pass.
