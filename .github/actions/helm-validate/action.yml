@@ -46,9 +46,3 @@ runs:
             -summary \
             -output text \
             -kubernetes-version ${{ inputs.kubernetes-version }}
-    - name: Debug connectivity
-      shell: bash
-      run: |
-        echo "Runner IP:"
-        curl -s ifconfig.me
-        nc -zv -w 10 vsgate-ssh.dei.isep.ipp.pt 10581
