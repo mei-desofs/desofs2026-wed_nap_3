@@ -9,7 +9,7 @@ on:
 jobs:
   # ──────────────────────────────────────────────────────────────
   # Job 1: Compile and run all tests.
-  # Both downstream jobs (sca, sast) gate on this one.
+  # All downstream jobs gate on this one.
   # ──────────────────────────────────────────────────────────────
   build-and-test:
     name: Build & Test
@@ -147,19 +147,49 @@ jobs:
           ignore-unfixed: true
 
   # ──────────────────────────────────────────────────────────────
-  # Job 5: DAST — OWASP ZAP API Scan.
-  # Starts the application with the test profile (H2 in-memory DB,
-  # placeholder JWK URI) and runs ZAP against the OpenAPI spec.
-  # ZAP tests the HTTP layer: security headers, error handling,
-  # and correct 401 responses on protected endpoints.
-  # -I flag: report findings without failing the build — same
-  # pattern as SonarCloud quality gate, to be tightened once
-  # a ZAP alert filter is configured for this project.
+  # Job 5: Helm chart lint and Kubernetes manifest validation.
+  # Catches broken chart templates and invalid K8s manifests
+  # before they reach the deploy job.
+  # ──────────────────────────────────────────────────────────────
+  helm-validate:
+    name: Helm Validate
+    runs-on: ubuntu-latest
+    needs: build-and-test
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Validate Helm chart
+        uses: ./.github/actions/helm-validate
+
+  # ──────────────────────────────────────────────────────────────
+  # Job 6: DAST — OWASP ZAP API Scan.
+  # Starts the application against a real PostgreSQL container and
+  # runs ZAP against the OpenAPI spec. ZAP tests the HTTP layer:
+  # security headers, error handling, and 401 enforcement.
+  # -I flag: report findings without failing the build — to be
+  # tightened once a ZAP alert filter is configured.
   # ──────────────────────────────────────────────────────────────
   dast:
     name: DAST — OWASP ZAP
     runs-on: ubuntu-latest
     needs: build-and-test
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: enderchest_dast
+          POSTGRES_USER: enderchest
+          POSTGRES_PASSWORD: enderchest_dast
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
 
     steps:
       - name: Checkout source
@@ -178,7 +208,11 @@ jobs:
       - name: Start application
         run: |
           java -jar target/enderchest-*.jar \
-            --spring.profiles.active=test &
+            --spring.datasource.url=jdbc:postgresql://localhost:5432/enderchest_dast \
+            --spring.datasource.username=enderchest \
+            --spring.datasource.password=enderchest_dast \
+            --spring.jpa.hibernate.ddl-auto=create \
+            --spring.security.oauth2.resourceserver.jwt.jwk-set-uri=http://localhost:9090/realms/test/protocol/openid-connect/certs &
 
       - name: Wait for application to be ready
         run: |
@@ -211,3 +245,26 @@ jobs:
           name: zap-dast-report
           path: zap-report.html
           retention-days: 30
+
+  # ──────────────────────────────────────────────────────────────
+  # Job 7: Deploy to K3s cluster.
+  # Only runs on pushes to main (not PRs) after all security and
+  # validation jobs pass. Builds the Docker image, pushes to GHCR,
+  # packages the Helm chart, and deploys via SSH to the Azure VM.
+  # ──────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: [sca, sonar, trivy, helm-validate, dast]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Deploy to K3s
+        uses: ./.github/actions/deploy
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          app-private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
