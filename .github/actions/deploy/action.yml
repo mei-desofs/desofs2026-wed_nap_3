@@ -107,4 +107,5 @@ runs:
             --version "0.1.${CHART_VERSION}" \
             --set image.repository=ghcr.io/mei-desofs/desofs2026-wed_nap_3/ender-chest \
             --set image.tag="${IMAGE_TAG}" \
-            --set imagePullSecrets[0].name=ghcr-secret
+            --set imagePullSecrets[0].name=ghcr-secret \
+            --wait
