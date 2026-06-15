@@ -74,7 +74,7 @@ runs:
       uses: appleboy/ssh-action@v1
       with:
         host: 172.160.228.21
-        username: root
+        username: azureuser
         port: 22
         key_path: /tmp/id_ed25519
         timeout: 60s
