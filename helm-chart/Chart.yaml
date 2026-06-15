@@ -9,3 +9,8 @@ keywords:
   - security
   - collaboration
 home: https://github.com/your-org/enderchest
+dependencies:
+  - name: postgresql
+    version: "~16"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled

@@ -6,6 +6,9 @@ image:
   tag: latest
   pullPolicy: IfNotPresent
 
+imagePullSecrets:
+  - name: ghcr-secret
+
 service:
   type: ClusterIP
   port: 8080
@@ -44,9 +47,21 @@ env:
   SPRING_DATASOURCE_URL: "jdbc:postgresql://enderchest-postgresql:5432/enderchest_db"
   SPRING_DATASOURCE_USERNAME: "postgres"
   SPRING_JPA_HIBERNATE_DDL_AUTO: "update"
+  SPRING_PROFILES_ACTIVE: "prod"
   FILE_STORAGE_BASE_PATH: "/data/files"
 
 persistence:
   enabled: true
   size: 10Gi
   mountPath: /data/files
+
+# ═══════════════════════════════════════════════════════════════
+# ELK Stack — Centralized audit logging (SDR-NEW-03)
+# Elasticsearch + Kibana + Filebeat for structured log analysis
+# ═══════════════════════════════════════════════════════════════
+elk:
+  enabled: true
+  elasticsearch:
+    persistence:
+      enabled: true
+      size: 5Gi
