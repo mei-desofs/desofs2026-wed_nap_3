@@ -14,10 +14,8 @@ service:
 ingress:
   enabled: true
   className: traefik
-  annotations:
-    traefik.ingress.kubernetes.io/router.entrypoints: web
   hosts:
-    - host: 172.160.228.21
+    - host: enderchest.swedencentral.cloudapp.azure.com
       paths:
         - path: /
           pathType: Prefix
