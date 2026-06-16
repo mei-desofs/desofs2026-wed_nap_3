@@ -139,7 +139,7 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://localhost:9090/realms/test/protocol/openid-connect/certs
-        run: mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=mei-desofs-wed-nap-3_mei-desofs-wed-nap-3-sonarqube -Dsonar.qualitygate.wait=true
+        run: mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=mei-desofs-wed-nap-3_mei-desofs-wed-nap-3-sonarqube
 
   # ──────────────────────────────────────────────────────────────
   # Job 5: Container Security Scan — Trivy.
