@@ -26,14 +26,14 @@ ingress:
 
 postgresql:
   enabled: true
+  image: postgres:16-alpine
   auth:
     username: postgres
     password: postgres
     database: enderchest_db
-  primary:
-    persistence:
-      enabled: true
-      size: 10Gi
+  persistence:
+    enabled: true
+    size: 10Gi
 
 resources:
   limits:
@@ -44,7 +44,7 @@ resources:
     memory: 256Mi
 
 env:
-  SPRING_DATASOURCE_URL: "jdbc:postgresql://enderchest-postgresql:5432/enderchest_db"
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://ender-chest-enderchest-postgresql:5432/enderchest_db"
   SPRING_DATASOURCE_USERNAME: "postgres"
   SPRING_JPA_HIBERNATE_DDL_AUTO: "update"
   SPRING_PROFILES_ACTIVE: "prod"
