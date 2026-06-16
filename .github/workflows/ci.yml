@@ -35,7 +35,31 @@ jobs:
         run: mvn -B clean install
 
   # ──────────────────────────────────────────────────────────────
-  # Job 2: Software Composition Analysis (SCA).
+  # Job 2: Secret Scanning — Gitleaks.
+  # Scans the full git history for committed secrets (API keys,
+  # tokens, passwords). Runs independently of build-and-test since
+  # it only needs the repository contents.
+  # GitHub's built-in secret scanning also runs automatically but
+  # only alerts — this job actively fails the build on detection.
+  # ──────────────────────────────────────────────────────────────
+  secret-scan:
+    name: Secret Scanning — Gitleaks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
+  # ──────────────────────────────────────────────────────────────
+  # Job 3: Software Composition Analysis (SCA).
   # Fails the build if any dependency has CVSS >= 7.0 (HIGH).
   # ──────────────────────────────────────────────────────────────
   sca:
@@ -83,7 +107,7 @@ jobs:
           retention-days: 30
 
   # ──────────────────────────────────────────────────────────────
-  # Job 3: SAST — SonarCloud analysis with coverage.
+  # Job 4: SAST — SonarCloud analysis with coverage.
   # Results appear in sonarcloud.io under the project dashboard.
   # ──────────────────────────────────────────────────────────────
   sonar:
@@ -118,7 +142,7 @@ jobs:
         run: mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=mei-desofs-wed-nap-3_mei-desofs-wed-nap-3-sonarqube
 
   # ──────────────────────────────────────────────────────────────
-  # Job 4: Container Security Scan — Trivy.
+  # Job 5: Container Security Scan — Trivy.
   # Builds the Docker image and scans OS-level packages for CVEs
   # that OWASP DC cannot see (Alpine packages, JRE native libs).
   # Fails on HIGH/CRITICAL severity with a known fix available.
@@ -147,7 +171,7 @@ jobs:
           ignore-unfixed: true
 
   # ──────────────────────────────────────────────────────────────
-  # Job 5: Helm chart lint and Kubernetes manifest validation.
+  # Job 6: Helm chart lint and Kubernetes manifest validation.
   # Catches broken chart templates and invalid K8s manifests
   # before they reach the deploy job.
   # ──────────────────────────────────────────────────────────────
@@ -164,7 +188,7 @@ jobs:
         uses: ./.github/actions/helm-validate
 
   # ──────────────────────────────────────────────────────────────
-  # Job 6: DAST — OWASP ZAP API Scan.
+  # Job 7: DAST — OWASP ZAP API Scan.
   # Starts the application against a real PostgreSQL container and
   # runs ZAP against the OpenAPI spec. ZAP tests the HTTP layer:
   # security headers, error handling, and 401 enforcement.
@@ -249,7 +273,7 @@ jobs:
           retention-days: 30
 
   # ──────────────────────────────────────────────────────────────
-  # Job 7: Deploy — only on main, after all checks pass.
+  # Job 8: Deploy — only on main, after all checks pass.
   # Builds Docker image, pushes to GHCR, packages Helm chart,
   # and deploys to a remote Kind cluster via SSH.
   # ──────────────────────────────────────────────────────────────
