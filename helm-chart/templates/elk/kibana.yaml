@@ -62,8 +62,15 @@ metadata:
   name: {{ include "enderchest.fullname" . }}-kibana
   labels:
     {{- include "enderchest.labels" . | nindent 4 }}
+  annotations:
+    traefik.ingress.kubernetes.io/router.tls.certresolver: letsencrypt
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
 spec:
   ingressClassName: traefik
+  tls:
+  - secretName: enderchest-kibana-tls
+    hosts:
+    - {{ (index .Values.ingress.hosts 0).host }}
   rules:
   - host: {{ (index .Values.ingress.hosts 0).host }}
     http:
