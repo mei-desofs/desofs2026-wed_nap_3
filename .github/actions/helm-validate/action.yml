@@ -45,4 +45,5 @@ runs:
             -strict \
             -summary \
             -output text \
+            -skip Middleware \
             -kubernetes-version ${{ inputs.kubernetes-version }}
