@@ -1,0 +1,13 @@
+# Gitleaks configuration for EnderChest.
+# Extends the default ruleset and adds project-specific allowlists for
+# known-public, non-secret values that trigger false positives.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Global allowlist of non-secret public identifiers"
+regexes = [
+  # SonarCloud project key — a public identifier, not a credential.
+  '''mei-desofs-wed-nap-3_mei-desofs-wed-nap-3-sonarqube''',
+]
