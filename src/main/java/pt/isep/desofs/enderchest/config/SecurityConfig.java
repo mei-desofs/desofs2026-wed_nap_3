@@ -8,6 +8,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 
 import java.util.Collections;
@@ -24,7 +25,13 @@ public class SecurityConfig {
     private static final String ROLES_CLAIM = "https://enderchest-api/roles";
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public RateLimiterFilter rateLimiterFilter(ApplicationProperties properties) {
+        return new RateLimiterFilter(properties);
+    }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http,
+                                                   RateLimiterFilter rateLimiterFilter) throws Exception {
         http
                 // Desativar CSRF — API stateless, não usa cookies para autenticação (SDR-01)
                 .csrf(csrf -> csrf.disable())
@@ -51,7 +58,10 @@ public class SecurityConfig {
                         .jwt(jwt -> jwt
                                 .jwtAuthenticationConverter(jwtAuthenticationConverter())
                         )
-                );
+                )
+
+                // Rate limiting filter runs after authentication is resolved (SDR-10)
+                .addFilterAfter(rateLimiterFilter, BearerTokenAuthenticationFilter.class);
 
         return http.build();
     }

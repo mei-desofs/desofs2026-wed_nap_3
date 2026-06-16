@@ -6,6 +6,9 @@ image:
   tag: latest
   pullPolicy: IfNotPresent
 
+imagePullSecrets:
+  - name: ghcr-secret
+
 service:
   type: ClusterIP
   port: 8080
@@ -14,19 +17,12 @@ service:
 ingress:
   enabled: true
   className: traefik
-  annotations:
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
-    traefik.ingress.kubernetes.io/router.entrypoints: websecure
-    traefik.ingress.kubernetes.io/router.tls: "true"
   hosts:
-    - host: enderchest.local
+    - host: enderchest.swedencentral.cloudapp.azure.com
       paths:
         - path: /
           pathType: Prefix
-  tls:
-    - secretName: enderchest-tls
-      hosts:
-        - enderchest.local
+  tls: []
 
 postgresql:
   enabled: true
@@ -51,9 +47,21 @@ env:
   SPRING_DATASOURCE_URL: "jdbc:postgresql://enderchest-postgresql:5432/enderchest_db"
   SPRING_DATASOURCE_USERNAME: "postgres"
   SPRING_JPA_HIBERNATE_DDL_AUTO: "update"
+  SPRING_PROFILES_ACTIVE: "prod"
   FILE_STORAGE_BASE_PATH: "/data/files"
 
 persistence:
   enabled: true
   size: 10Gi
   mountPath: /data/files
+
+# ═══════════════════════════════════════════════════════════════
+# ELK Stack — Centralized audit logging (SDR-NEW-03)
+# Elasticsearch + Kibana + Filebeat for structured log analysis
+# ═══════════════════════════════════════════════════════════════
+elk:
+  enabled: true
+  elasticsearch:
+    persistence:
+      enabled: true
+      size: 5Gi
