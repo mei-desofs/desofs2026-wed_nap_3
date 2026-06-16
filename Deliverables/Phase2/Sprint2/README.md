@@ -62,16 +62,16 @@ flowchart LR
 
 ### 3.2 Test Coverage & Quality Gate
 
-New unit test classes were added for previously untested services:
+New unit test classes were added across previously untested services, controllers, configuration, entities and exceptions, raising JaCoCo instruction coverage from **27%** (Sprint 1) to **87.5%**.
 
-| Test Class | Tests | Service Under Test |
-|:-----------|:-----:|:-------------------|
-| `FolderServiceTest` | 13 | FolderService |
-| `UserServiceTest` | 9 | UserService |
-| `AccessShareServiceTest` | 9 | AccessShareService |
-| `GlobalSecurityExceptionHandlerTest` | 7 | Security exception handling |
+| Layer | Test Classes | Targets |
+|:------|:-------------|:--------|
+| Service | `FolderServiceTest`, `UserServiceTest`, `AccessShareServiceTest`, `AuditLogServiceTest`, `FileServiceTest`, `FileVersionServiceTest`, `FileStorageServiceTest` | Folder, User, AccessShare, AuditLog, File, FileVersion, FileStorage services |
+| Controller | `FolderControllerTest`, `AccessShareControllerTest`, `FileControllerTest`, `FileVersionControllerTest`, `UserControllerTest` | REST endpoint handlers |
+| Config | `ApiExceptionHandlerTest`, `RateLimiterFilterTest`, `ApplicationPropertiesTest`, `GlobalSecurityExceptionHandlerTest` | Exception handling, rate-limiting filter, typed config properties |
+| Entity / Exception | `EntityCoverageTest`, `ExceptionConstructorsTest` | Domain entities and custom exceptions |
 
-SonarCloud analysis runs in the `sonar` job with JaCoCo coverage reporting, and the pipeline enforces the SonarCloud quality gate via `-Dsonar.qualitygate.wait=true`.
+The full suite runs **225 unit tests** with `BUILD SUCCESS`. SonarCloud analysis runs in the `sonar` job with JaCoCo coverage reporting, and the pipeline enforces the SonarCloud quality gate via `-Dsonar.qualitygate.wait=true`.
 
 ### 3.3 Rate-Limiting Tests
 

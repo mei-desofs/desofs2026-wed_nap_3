@@ -130,7 +130,7 @@ The `sonar` job runs `mvn verify` before the analysis, which executes all tests 
 SonarCloud's default quality gate ("Sonar way") requires ≥ 80% coverage on new code. In Sprint 1 the `-Dsonar.qualitygate.wait=true` flag was intentionally left unset so a failing gate would not block the build while coverage was still low.
 
 > [!NOTE]
-> In Sprint 2 the flag was enabled in the `sonar` job, so the pipeline now waits on and enforces the SonarCloud quality gate. Coverage was raised with new service-layer tests (Folder, User, AccessShare) to support this. See [Sprint2/README.md §3.2](./Sprint2/README.md#32-test-coverage--quality-gate).
+> In Sprint 2 the flag was enabled in the `sonar` job, so the pipeline now waits on and enforces the SonarCloud quality gate. Coverage was raised from 27% to 87.5% with new unit tests spanning the service, controller, configuration, entity and exception layers. See [Sprint2/README.md §3.2](./Sprint2/README.md#32-test-coverage--quality-gate).
 
 ---
 
