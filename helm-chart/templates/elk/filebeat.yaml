@@ -1,0 +1,119 @@
+{{- if .Values.elk.enabled }}
+# ═══════════════════════════════════════════════════════════════
+# Filebeat DaemonSet — Collects container logs and ships to
+# Elasticsearch for centralized audit trail (SDR-NEW-03)
+# ═══════════════════════════════════════════════════════════════
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "enderchest.fullname" . }}-filebeat-config
+  labels:
+    {{- include "enderchest.labels" . | nindent 4 }}
+data:
+  filebeat.yml: |
+    filebeat.inputs:
+    - type: container
+      paths:
+        - /var/log/containers/*enderchest*_default_enderchest-*.log
+      exclude_files:
+        - '.*filebeat.*'
+        - '.*elasticsearch.*'
+        - '.*kibana.*'
+        - '.*postgresql.*'
+      json.keys_under_root: true
+      json.overwrite_keys: false
+      json.add_error_key: true
+      json.message_key: message
+
+    output.elasticsearch:
+      hosts: ["http://{{ include "enderchest.fullname" . }}-elasticsearch:9200"]
+      index: "enderchest-app-%{+yyyy.MM.dd}"
+
+    setup.ilm.enabled: false
+    setup.template.name: "enderchest-app"
+    setup.template.pattern: "enderchest-app-*"
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "enderchest.fullname" . }}-filebeat
+  labels:
+    app: filebeat
+    {{- include "enderchest.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app: filebeat
+  template:
+    metadata:
+      labels:
+        app: filebeat
+    spec:
+      serviceAccountName: {{ include "enderchest.fullname" . }}-filebeat
+      containers:
+      - name: filebeat
+        image: docker.elastic.co/beats/filebeat:8.15.0
+        args: ["-c", "/etc/filebeat/filebeat.yml", "-e"]
+        resources:
+          limits:
+            cpu: 200m
+            memory: 256Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        volumeMounts:
+        - name: config
+          mountPath: /etc/filebeat
+          readOnly: true
+        - name: varlog
+          mountPath: /var/log
+          readOnly: true
+        - name: containers
+          mountPath: /var/log/containers
+          readOnly: true
+        - name: pods
+          mountPath: /var/log/pods
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: {{ include "enderchest.fullname" . }}-filebeat-config
+      - name: varlog
+        hostPath:
+          path: /var/log
+      - name: containers
+        hostPath:
+          path: /var/log/containers
+      - name: pods
+        hostPath:
+          path: /var/log/pods
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "enderchest.fullname" . }}-filebeat
+  labels:
+    {{- include "enderchest.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "enderchest.fullname" . }}-filebeat
+rules:
+- apiGroups: [""]
+  resources: ["pods", "namespaces"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "enderchest.fullname" . }}-filebeat
+subjects:
+- kind: ServiceAccount
+  name: {{ include "enderchest.fullname" . }}-filebeat
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: ClusterRole
+  name: {{ include "enderchest.fullname" . }}-filebeat
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}

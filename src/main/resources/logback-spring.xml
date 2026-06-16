@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Structured JSON logging for ELK/SIEM ingestion (SDR-NEW-03).
+         
+         In production (K3s), Filebeat collects container stdout and
+         ships JSON events to Elasticsearch. Kibana provides dashboards
+         for security monitoring and audit trail analysis.
+         ═══════════════════════════════════════════════════════════════ -->
+
+    <!-- Human-readable console output for local development -->
+    <springProfile name="!prod">
+        <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            </encoder>
+        </appender>
+
+        <root level="INFO">
+            <appender-ref ref="CONSOLE" />
+        </root>
+    </springProfile>
+
+    <!-- Structured JSON output for production (collected by Filebeat) -->
+    <springProfile name="prod">
+        <appender name="JSON_STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                <includeMdcKeyName>userId</includeMdcKeyName>
+                <includeMdcKeyName>action</includeMdcKeyName>
+                <includeMdcKeyName>resourceId</includeMdcKeyName>
+                <includeMdcKeyName>traceId</includeMdcKeyName>
+                <fieldNames>
+                    <timestamp>@timestamp</timestamp>
+                    <version>[ignore]</version>
+                </fieldNames>
+                <customFields>{"service":"enderchest","environment":"production"}</customFields>
+            </encoder>
+        </appender>
+
+        <root level="INFO">
+            <appender-ref ref="JSON_STDOUT" />
+        </root>
+    </springProfile>
+
+</configuration>

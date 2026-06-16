@@ -1,0 +1,85 @@
+{{- if .Values.elk.enabled }}
+# ═══════════════════════════════════════════════════════════════
+# Kibana — Dashboard UI for audit log analysis (SDR-NEW-03)
+# ═══════════════════════════════════════════════════════════════
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "enderchest.fullname" . }}-kibana
+  labels:
+    app: kibana
+    {{- include "enderchest.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kibana
+  template:
+    metadata:
+      labels:
+        app: kibana
+    spec:
+      containers:
+      - name: kibana
+        image: docker.elastic.co/kibana/kibana:8.15.0
+        env:
+        - name: ELASTICSEARCH_HOSTS
+          value: "http://{{ include "enderchest.fullname" . }}-elasticsearch:9200"
+        - name: SERVER_BASEPATH
+          value: "/kibana"
+        - name: SERVER_REWRITEBASEPATH
+          value: "true"
+        - name: NODE_OPTIONS
+          value: "--max-old-space-size=512"
+        ports:
+        - containerPort: 5601
+          name: http
+        resources:
+          limits:
+            cpu: 1
+            memory: 1Gi
+          requests:
+            cpu: 250m
+            memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "enderchest.fullname" . }}-kibana
+  labels:
+    {{- include "enderchest.labels" . | nindent 4 }}
+spec:
+  selector:
+    app: kibana
+  ports:
+  - port: 5601
+    targetPort: 5601
+    name: http
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "enderchest.fullname" . }}-kibana
+  labels:
+    {{- include "enderchest.labels" . | nindent 4 }}
+  annotations:
+    traefik.ingress.kubernetes.io/router.tls.certresolver: letsencrypt
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+spec:
+  ingressClassName: traefik
+  tls:
+  - secretName: enderchest-kibana-tls
+    hosts:
+    - {{ (index .Values.ingress.hosts 0).host }}
+  rules:
+  - host: {{ (index .Values.ingress.hosts 0).host }}
+    http:
+      paths:
+      - path: /kibana
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ include "enderchest.fullname" . }}-kibana
+            port:
+              number: 5601
+{{- end }}

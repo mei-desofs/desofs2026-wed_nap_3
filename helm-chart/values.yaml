@@ -17,23 +17,29 @@ service:
 ingress:
   enabled: true
   className: traefik
+  annotations:
+    traefik.ingress.kubernetes.io/router.tls.certresolver: letsencrypt
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
   hosts:
     - host: enderchest.swedencentral.cloudapp.azure.com
       paths:
         - path: /
           pathType: Prefix
-  tls: []
+  tls:
+    - secretName: enderchest-tls
+      hosts:
+        - enderchest.swedencentral.cloudapp.azure.com
 
 postgresql:
   enabled: true
+  image: postgres:16-alpine
   auth:
     username: postgres
     password: postgres
     database: enderchest_db
-  primary:
-    persistence:
-      enabled: true
-      size: 10Gi
+  persistence:
+    enabled: true
+    size: 10Gi
 
 resources:
   limits:
@@ -44,7 +50,7 @@ resources:
     memory: 256Mi
 
 env:
-  SPRING_DATASOURCE_URL: "jdbc:postgresql://enderchest-postgresql:5432/enderchest_db"
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://ender-chest-enderchest-postgresql:5432/enderchest_db"
   SPRING_DATASOURCE_USERNAME: "postgres"
   SPRING_JPA_HIBERNATE_DDL_AUTO: "update"
   SPRING_PROFILES_ACTIVE: "prod"
@@ -65,3 +71,11 @@ elk:
     persistence:
       enabled: true
       size: 5Gi
+
+# ═══════════════════════════════════════════════════════════════
+# TLS — Automatic Let's Encrypt via Traefik's built-in ACME
+# No extra pods needed. Requires ports 80 + 443 open.
+# ═══════════════════════════════════════════════════════════════
+tls:
+  enabled: true
+  acmeEmail: your-email@isep.ipp.pt

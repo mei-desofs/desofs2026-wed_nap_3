@@ -31,18 +31,26 @@ spec:
         - name: {{ $key }}
           value: "{{ $value }}"
         {{- end }}
-        livenessProbe:
+        startupProbe:
           httpGet:
-            path: /v3/api-docs
+            path: /actuator/health
             port: http
           initialDelaySeconds: 30
-          periodSeconds: 10
+          periodSeconds: 5
+          failureThreshold: 12
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: http
+          periodSeconds: 30
+          failureThreshold: 3
         readinessProbe:
           httpGet:
-            path: /v3/api-docs
+            path: /actuator/health
             port: http
-          initialDelaySeconds: 10
-          periodSeconds: 5
+          initialDelaySeconds: 5
+          periodSeconds: 15
+          failureThreshold: 3
         resources:
           {{- toYaml .Values.resources | nindent 12 }}
         volumeMounts:

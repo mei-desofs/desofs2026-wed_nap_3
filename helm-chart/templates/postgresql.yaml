@@ -1,0 +1,92 @@
+{{- if .Values.postgresql.enabled }}
+# ═══════════════════════════════════════════════════════════════
+# PostgreSQL — Official image (no Bitnami dependency)
+# ═══════════════════════════════════════════════════════════════
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "enderchest.fullname" . }}-postgresql
+  labels:
+    app: postgresql
+    {{- include "enderchest.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "enderchest.fullname" . }}-postgresql
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgresql
+  template:
+    metadata:
+      labels:
+        app: postgresql
+    spec:
+      containers:
+      - name: postgresql
+        image: {{ .Values.postgresql.image }}
+        env:
+        - name: POSTGRES_USER
+          value: {{ .Values.postgresql.auth.username | quote }}
+        - name: POSTGRES_PASSWORD
+          value: {{ .Values.postgresql.auth.password | quote }}
+        - name: POSTGRES_DB
+          value: {{ .Values.postgresql.auth.database | quote }}
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        ports:
+        - containerPort: 5432
+          name: tcp-postgresql
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - {{ .Values.postgresql.auth.username }}
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - {{ .Values.postgresql.auth.username }}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        volumeMounts:
+        - name: pgdata
+          mountPath: /var/lib/postgresql/data
+  {{- if .Values.postgresql.persistence.enabled }}
+  volumeClaimTemplates:
+  - metadata:
+      name: pgdata
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: {{ .Values.postgresql.persistence.size }}
+  {{- else }}
+      volumes:
+      - name: pgdata
+        emptyDir: {}
+  {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "enderchest.fullname" . }}-postgresql
+  labels:
+    {{- include "enderchest.labels" . | nindent 4 }}
+spec:
+  selector:
+    app: postgresql
+  ports:
+  - port: 5432
+    targetPort: 5432
+    name: tcp-postgresql
+{{- end }}
