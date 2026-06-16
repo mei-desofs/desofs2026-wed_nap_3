@@ -43,13 +43,10 @@ flowchart TD
 
 Jobs 2, 3, and 4 run in parallel after Job 1 passes. This keeps total pipeline time low while ensuring that no security scan runs against code that does not compile or has failing tests.
 
-    build --> sca
-    build --> sonar
-    build --> trivy
+> [!NOTE]
+> Sprint 2 added a `DAST — OWASP ZAP` job and a `Helm Validate` job. See [Sprint2/README.md §4](./Sprint2/README.md#4-cicd-pipeline-sprint-2-state) for the current full pipeline.
 
-    sca["Job 2 — SCA\nOWASP Dependency-Check\nFails on CVSS ≥ 7.0"]
-    sonar["Job 3 — SAST\nSonarCloud\nCode quality + security rules"]
-    trivy["Job 4 — Container Scan\nTrivy\nFails on HIGH/CRITICAL CVEs\nwith a known fix available"]
+### 2.2 Triggers
 
 The pipeline triggers on every push and every pull request targeting `main`. This enforces all security gates at PR time, before any code reaches the main branch.
 
@@ -113,11 +110,12 @@ SonarCloud was added as a complementary SAST layer because it provides:
 
 The `sonar` job runs `mvn verify` before the analysis, which executes all tests and generates the JaCoCo XML report. SonarCloud picks this up automatically and shows per-file coverage on the project dashboard.
 
-### 4.3 Quality Gate — Known Limitation
+### 4.3 Quality Gate
 
-SonarCloud's default quality gate ("Sonar way") requires ≥ 80% coverage on new code. The current test suite does not reach this threshold, so the quality gate shows as failed in the SonarCloud dashboard. The pipeline job itself still passes because `-Dsonar.qualitygate.wait=true` is intentionally not set.
+SonarCloud's default quality gate ("Sonar way") requires ≥ 80% coverage on new code. In Sprint 1 the `-Dsonar.qualitygate.wait=true` flag was intentionally left unset so a failing gate would not block the build while coverage was still low.
 
-Adding that flag would make the pipeline correctly fail on quality gate violations, but doing so without a custom quality gate would permanently break the pipeline until coverage reaches 80%. The correct resolution — creating a custom quality gate with a threshold appropriate to this project's maturity and then enabling the flag — is tracked as a known gap for a future sprint.
+> [!NOTE]
+> In Sprint 2 the flag was enabled in the `sonar` job, so the pipeline now waits on and enforces the SonarCloud quality gate. Coverage was raised with new service-layer tests (Folder, User, AccessShare) to support this. See [Sprint2/README.md §3.2](./Sprint2/README.md#32-test-coverage--quality-gate).
 
 ---
 
@@ -162,8 +160,8 @@ One required reviewer was chosen over two because the team has 4 developers on a
 | Item | Trade-off |
 |---|---|
 | OWASP DC CVSS threshold 7.0 | Medium CVEs (4.0–6.9) do not block the build. A future sprint could tighten this to 6.0. |
-| SonarCloud quality gate not enforced | `-Dsonar.qualitygate.wait=true` is not set because the default gate requires 80% coverage which the current test suite does not reach. Fix: create a custom quality gate with an appropriate threshold, then enable the flag. |
+| SonarCloud quality gate | Enforced in Sprint 2 via `-Dsonar.qualitygate.wait=true`. A custom gate threshold appropriate to the project's coverage was used so the pipeline fails on real regressions rather than the default 80% rule. |
 | SonarCloud free tier — main branch only | PR-level analysis (inline comments on pull requests) is a paid SonarCloud feature. Only the `main` branch is analysed on the free tier. |
 | NVD cache refresh weekly | New CVEs published mid-week are not picked up until the cache expires. Critical zero-days would require manually invalidating the cache. |
-| No DAST in pipeline | OWASP ZAP DAST was planned in Phase 1 (ST-01, ST-03, ST-06). It requires a running application instance and is deferred to a sprint where a staging environment exists. |
+| DAST added in Sprint 2 | OWASP ZAP DAST (planned in Phase 1 — ST-01, ST-03, ST-06) was deferred from Sprint 1 and added in Sprint 2 as the `dast` job, which boots the app against PostgreSQL and scans the OpenAPI surface. |
 | Trivy — base image CVEs only | Trivy scans the OS layer in the Docker image. `ignore-unfixed: true` means unfixable Alpine CVEs are not blocking. When a fix is released, updating the base image tag in the `Dockerfile` resolves it. |
