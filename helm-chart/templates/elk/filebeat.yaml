@@ -14,16 +14,13 @@ data:
     filebeat.inputs:
     - type: container
       paths:
-        - /var/log/containers/{{ include "enderchest.fullname" . }}*.log
+        - /var/log/containers/*enderchest*.log
       processors:
         - decode_json_fields:
             fields: ["message"]
             target: ""
             overwrite_keys: true
-        - drop_event:
-            when:
-              not:
-                has_fields: ["service"]
+            add_error_key: true
 
     output.elasticsearch:
       hosts: ["http://{{ include "enderchest.fullname" . }}-elasticsearch:9200"]
@@ -71,6 +68,9 @@ spec:
         - name: containers
           mountPath: /var/log/containers
           readOnly: true
+        - name: pods
+          mountPath: /var/log/pods
+          readOnly: true
       volumes:
       - name: config
         configMap:
@@ -81,6 +81,9 @@ spec:
       - name: containers
         hostPath:
           path: /var/log/containers
+      - name: pods
+        hostPath:
+          path: /var/log/pods
 ---
 apiVersion: v1
 kind: ServiceAccount
