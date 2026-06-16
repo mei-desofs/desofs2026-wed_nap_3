@@ -62,8 +62,6 @@ metadata:
   name: {{ include "enderchest.fullname" . }}-kibana
   labels:
     {{- include "enderchest.labels" . | nindent 4 }}
-  annotations:
-    traefik.ingress.kubernetes.io/router.middlewares: {{ .Release.Namespace }}-kibana-stripprefix@kubernetescrd
 spec:
   ingressClassName: traefik
   rules:
@@ -77,13 +75,4 @@ spec:
             name: {{ include "enderchest.fullname" . }}-kibana
             port:
               number: 5601
----
-apiVersion: traefik.containo.us/v1alpha1
-kind: Middleware
-metadata:
-  name: kibana-stripprefix
-spec:
-  stripPrefix:
-    prefixes:
-      - /kibana
 {{- end }}
