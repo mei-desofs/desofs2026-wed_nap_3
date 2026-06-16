@@ -46,4 +46,5 @@ runs:
             -summary \
             -output text \
             -skip Middleware \
+            -skip HelmChartConfig \
             -kubernetes-version ${{ inputs.kubernetes-version }}
