@@ -29,16 +29,18 @@ spec:
           value: "/kibana"
         - name: SERVER_REWRITEBASEPATH
           value: "true"
+        - name: NODE_OPTIONS
+          value: "--max-old-space-size=512"
         ports:
         - containerPort: 5601
           name: http
         resources:
           limits:
-            cpu: 500m
-            memory: 512Mi
+            cpu: 1
+            memory: 1Gi
           requests:
             cpu: 250m
-            memory: 256Mi
+            memory: 512Mi
 ---
 apiVersion: v1
 kind: Service
@@ -61,7 +63,7 @@ metadata:
   labels:
     {{- include "enderchest.labels" . | nindent 4 }}
   annotations:
-    traefik.ingress.kubernetes.io/router.middlewares: default-kibana-stripprefix@kubernetescrd
+    traefik.ingress.kubernetes.io/router.middlewares: {{ .Release.Namespace }}-kibana-stripprefix@kubernetescrd
 spec:
   ingressClassName: traefik
   rules:
@@ -76,7 +78,7 @@ spec:
             port:
               number: 5601
 ---
-apiVersion: traefik.io/v1alpha1
+apiVersion: traefik.containo.us/v1alpha1
 kind: Middleware
 metadata:
   name: kibana-stripprefix
