@@ -262,4 +262,54 @@ class FileAccessControlIT {
         mockMvc.perform(delete("/api/v1/files/" + fileId))
                 .andExpect(status().isUnauthorized());
     }
+
+    // ── Sprint 2 edge cases ────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("ST-02-12 (edge): FOLDER-type AccessShare with same ID does not grant access to a FILE")
+    void accessShareForFolderType_doesNotGrantFileAccess() throws Exception {
+        // A share exists for FOLDER resource type using the same fileId UUID,
+        // but it must NOT be honoured for the FILE endpoint.
+        AccessShare folderShare = new AccessShare(
+                fileId,
+                AccessShare.ResourceType.FOLDER,
+                userBId,
+                AccessShare.RoleType.OWNER
+        );
+        folderShare.setCreatedAt(LocalDateTime.now());
+        accessShareRepository.save(folderShare);
+
+        mockMvc.perform(get("/api/v1/files/" + fileId)
+                        .with(jwtFor(USER_B_SUB, USER_B_EMAIL, "ROLE_OWNER")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("ST-02-13 (edge): After AccessShare is deleted, User B can no longer access the file")
+    void revokedShare_noLongerGrantsAccess() throws Exception {
+        grantAccess(AccessShare.RoleType.VIEWER);
+
+        // Confirm access is granted
+        mockMvc.perform(get("/api/v1/files/" + fileId)
+                        .with(jwtFor(USER_B_SUB, USER_B_EMAIL, "ROLE_VIEWER")))
+                .andExpect(status().isNotFound()); // 404 = IDOR check passed, file not on disk
+
+        // Revoke all shares
+        accessShareRepository.deleteAll();
+
+        // Access should now be denied
+        mockMvc.perform(get("/api/v1/files/" + fileId)
+                        .with(jwtFor(USER_B_SUB, USER_B_EMAIL, "ROLE_VIEWER")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("ST-02-14 (edge): Owner accessing non-existent file gets 404, not 403")
+    void nonExistentFile_ownerGets404_notForbidden() throws Exception {
+        UUID nonExistentId = UUID.randomUUID();
+
+        mockMvc.perform(get("/api/v1/files/" + nonExistentId)
+                        .with(jwtFor(USER_A_SUB, USER_A_EMAIL, "ROLE_OWNER")))
+                .andExpect(status().isNotFound());
+    }
 }
