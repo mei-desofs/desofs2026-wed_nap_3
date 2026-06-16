@@ -24,7 +24,9 @@ runs:
 
     - name: Helm lint (strict)
       shell: bash
-      run: helm lint ${{ inputs.chart-path }} --strict
+      run: |
+        helm dependency build ${{ inputs.chart-path }}
+        helm lint ${{ inputs.chart-path }} --strict
 
     - name: Install kubeconform
       shell: bash

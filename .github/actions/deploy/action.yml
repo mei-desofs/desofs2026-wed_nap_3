@@ -49,6 +49,7 @@ runs:
       run: |
         echo "${{ github.token }}" | helm registry login ghcr.io \
           --username ${{ github.actor }} --password-stdin
+        helm dependency build ./helm-chart
         helm package ./helm-chart --version 0.1.${{ github.run_number }}
         helm push enderchest-0.1.${{ github.run_number }}.tgz \
           oci://ghcr.io/mei-desofs/desofs2026-wed_nap_3/charts
