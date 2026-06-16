@@ -14,6 +14,8 @@ Files created or modified as part of this work:
 | File | Purpose |
 |---|---|
 | `.github/workflows/ci.yml` | The pipeline definition |
+| `.github/actions/helm-validate/` | Composite action: Helm lint + kubeconform validation |
+| `.gitleaks.toml` | Gitleaks ruleset extension and false-positive allowlist |
 | `pom.xml` | OWASP DC, JaCoCo, and SonarCloud Maven configuration |
 | `owasp-suppressions.xml` | Documented false-positive suppressions for OWASP DC |
 
@@ -27,24 +29,37 @@ Files created or modified as part of this work:
 flowchart TD
     trigger([Push / Pull Request to main])
     trigger --> build
+    trigger --> secret
 
-    build["Job 1 — Build & Test\nmvn clean install\nH2 in-memory DB · JaCoCo coverage"]
+    secret["Secret Scanning\nGitleaks\nFails on detected secrets"]
+    build["Build & Test\nmvn clean install\nH2 in-memory DB · JaCoCo coverage"]
 
     build --> sca
     build --> sonar
     build --> trivy
+    build --> helm
+    build --> dast
 
-    sca["Job 2 — SCA\nOWASP Dependency-Check\nFails on CVSS ≥ 7.0"]
-    sonar["Job 3 — SAST\nSonarCloud\nCode quality + security rules"]
-    trivy["Job 4 — Container Scan\nTrivy\nFails on HIGH/CRITICAL CVEs\nwith a known fix available"]
+    sca["SCA\nOWASP Dependency-Check\nFails on CVSS ≥ 7.0"]
+    sonar["SAST\nSonarCloud\nQuality gate enforced"]
+    trivy["Container Scan\nTrivy\nFails on HIGH/CRITICAL CVEs\nwith a known fix available"]
+    helm["Helm Validate\nlint + kubeconform"]
+    dast["DAST\nOWASP ZAP\nRuntime scan vs OpenAPI"]
 
     sca --> report[/"OWASP HTML Report\nArtifact · 30 days"/]
+    dast --> zapreport[/"ZAP HTML Report\nArtifact · 30 days"/]
+
+    sca --> deploy
+    sonar --> deploy
+    trivy --> deploy
+    helm --> deploy
+    dast --> deploy
+    deploy["Deploy\nHelm → K3s\nmain branch · push only"]
 ```
 
-Jobs 2, 3, and 4 run in parallel after Job 1 passes. This keeps total pipeline time low while ensuring that no security scan runs against code that does not compile or has failing tests.
+The pipeline is organised into three tiers. **Secret Scanning** runs independently of the build so leaked credentials are caught even when the code does not compile. **Build & Test** is the gate for the security-analysis tier: SCA, SAST, Container Scan, Helm Validate, and DAST all run in parallel once it passes, which keeps total pipeline time low while ensuring no scan runs against code that does not compile or has failing tests. Finally, **Deploy** runs only on a push to `main` after every check has passed.
 
-> [!NOTE]
-> Sprint 2 added a `DAST — OWASP ZAP` job and a `Helm Validate` job. See [Sprint2/README.md §4](./Sprint2/README.md#4-cicd-pipeline-sprint-2-state) for the current full pipeline.
+Secret Scanning, Helm Validate, and DAST were not all present from the first iteration — DAST and Helm Validate were added once the application could be booted in CI and a Helm chart existed (see §7 and §8). The remainder of this document records the rationale behind each job.
 
 ### 2.2 Triggers
 
@@ -137,7 +152,53 @@ When a HIGH/CRITICAL CVE with a fix is found in the base image, the resolution i
 
 ---
 
-## 6. Branch Protection Rules
+## 6. Secret Scanning — Gitleaks
+
+### 6.1 What It Does
+
+The `secret-scan` job runs **Gitleaks** (`gitleaks/gitleaks-action@v2`) on every push and pull request. Gitleaks scans the repository — including git history — for committed credentials such as API keys, tokens, and private keys, and fails the build when a secret is detected. Unlike the other security jobs it does **not** depend on `build-and-test`, so leaked credentials are caught even when the code does not compile.
+
+### 6.2 False-Positive Allowlist
+
+A repository-level `.gitleaks.toml` extends the default ruleset (`useDefault = true`) and allowlists known-public identifiers that are not secrets — notably the SonarCloud project key (`mei-desofs-wed-nap-3_...`), which is a public reference and not a credential. Genuine secrets such as `SONAR_TOKEN`, `NVD_API_KEY`, and `GITLEAKS_LICENSE` are stored as GitHub Actions secrets and never appear in source.
+
+---
+
+## 7. Helm Chart Validation — kubeconform
+
+### 7.1 What It Does
+
+The `helm-validate` job runs a composite action (`.github/actions/helm-validate`) that lints the Helm chart and renders its templates, then validates the resulting Kubernetes manifests against the upstream JSON schemas with **kubeconform**. This catches malformed manifests, invalid field types, and unsupported API versions before they can be deployed.
+
+### 7.2 CRD Skips
+
+K3s-specific custom resources that are not part of the upstream Kubernetes schema set — `Middleware` (Traefik) and `HelmChartConfig` (K3s Traefik configuration) — are passed to kubeconform with `-skip` so that valid cluster-native resources do not fail validation.
+
+---
+
+## 8. Dynamic Application Security Testing (DAST) — OWASP ZAP
+
+### 8.1 Why DAST in Addition to SAST
+
+SAST (SonarCloud) and SCA (OWASP DC) analyse source code and dependencies statically — they never run the application. DAST exercises the **running** application over HTTP, catching issues only observable at runtime: missing security headers, error-handling leaks, and authentication enforcement on real endpoints. DAST (OWASP ZAP) was planned in Phase 1 (ST-01, ST-03, ST-06) but required a bootable application instance in CI, which is why it was introduced once that was in place.
+
+### 8.2 How It Runs
+
+The `dast` job stands up a realistic runtime environment and scans it:
+
+- A **PostgreSQL 16** service container provides a real database (not H2), so the app runs as it would in production.
+- The application JAR is built and started against that database, with the JWT JWK set URI pointed at a local placeholder so no external IdP is contacted.
+- The job polls `/v3/api-docs` until the application is ready.
+- **OWASP ZAP** (`ghcr.io/zaproxy/zaproxy:stable`, `zap-api-scan.py`) scans the application using its OpenAPI specification as the target surface.
+- The ZAP HTML report is uploaded as an artifact (`zap-dast-report`, 30-day retention) with `if: always()`.
+
+### 8.3 Report-Only Mode
+
+The scan runs with the `-I` flag, which reports findings without failing the build. This avoids blocking the pipeline on informational and low-severity ZAP alerts while the baseline is established; a ZAP alert filter can later promote selected rules to build-failing once the expected findings have been triaged.
+
+---
+
+## 9. Branch Protection Rules
 
 Branch protection was configured on the `main` branch in GitHub to enforce that all pipeline jobs pass before a pull request can be merged:
 
@@ -147,7 +208,7 @@ Branch protection was configured on the `main` branch in GitHub to enforce that 
 | Required approving reviews | 1 |
 | Dismiss stale PR approvals when new commits are pushed | Enabled |
 | Require status checks to pass before merging | Enabled |
-| Required status checks | `Build & Test`, `SCA — OWASP Dependency-Check`, `SAST — SonarCloud`, `Container Scan — Trivy` |
+| Required status checks | `Build & Test`, `Secret Scanning — Gitleaks`, `SCA — OWASP Dependency-Check`, `SAST — SonarCloud`, `Container Scan — Trivy`, `Helm Validate`, `DAST — OWASP ZAP` |
 | Require branches to be up to date before merging | Enabled |
 | Do not allow bypassing the above settings | Enabled |
 
@@ -155,7 +216,7 @@ One required reviewer was chosen over two because the team has 4 developers on a
 
 ---
 
-## 8. Trade-offs and Known Limitations
+## 10. Trade-offs and Known Limitations
 
 | Item | Trade-off |
 |---|---|
@@ -163,5 +224,5 @@ One required reviewer was chosen over two because the team has 4 developers on a
 | SonarCloud quality gate | Enforced in Sprint 2 via `-Dsonar.qualitygate.wait=true`. A custom gate threshold appropriate to the project's coverage was used so the pipeline fails on real regressions rather than the default 80% rule. |
 | SonarCloud free tier — main branch only | PR-level analysis (inline comments on pull requests) is a paid SonarCloud feature. Only the `main` branch is analysed on the free tier. |
 | NVD cache refresh weekly | New CVEs published mid-week are not picked up until the cache expires. Critical zero-days would require manually invalidating the cache. |
-| DAST added in Sprint 2 | OWASP ZAP DAST (planned in Phase 1 — ST-01, ST-03, ST-06) was deferred from Sprint 1 and added in Sprint 2 as the `dast` job, which boots the app against PostgreSQL and scans the OpenAPI surface. |
+| DAST runs report-only | The ZAP scan uses `-I`, so findings are reported as an artifact but do not fail the build. Tightening requires a ZAP alert filter to separate expected from actionable findings (see §8.3). |
 | Trivy — base image CVEs only | Trivy scans the OS layer in the Docker image. `ignore-unfixed: true` means unfixable Alpine CVEs are not blocking. When a fix is released, updating the base image tag in the `Dockerfile` resolves it. |
