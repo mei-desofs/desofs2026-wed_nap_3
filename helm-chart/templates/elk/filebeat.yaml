@@ -28,10 +28,11 @@ data:
     output.elasticsearch:
       hosts: ["http://{{ include "enderchest.fullname" . }}-elasticsearch:9200"]
       index: "enderchest-app-%{+yyyy.MM.dd}"
+      allow_older_versions: true
+      data_stream.enabled: false
 
     setup.ilm.enabled: false
-    setup.template.name: "enderchest-app"
-    setup.template.pattern: "enderchest-app-*"
+    setup.template.enabled: false
 ---
 apiVersion: apps/v1
 kind: DaemonSet
