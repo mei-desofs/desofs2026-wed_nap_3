@@ -14,21 +14,24 @@ data:
     filebeat.inputs:
     - type: container
       paths:
-        - /var/log/containers/*enderchest*.log
-      processors:
-        - decode_json_fields:
-            fields: ["message"]
-            target: ""
-            overwrite_keys: true
-            add_error_key: true
+        - /var/log/containers/*enderchest*_default_enderchest-*.log
+      exclude_files:
+        - '.*filebeat.*'
+        - '.*elasticsearch.*'
+        - '.*kibana.*'
+        - '.*postgresql.*'
+      json.keys_under_root: true
+      json.overwrite_keys: false
+      json.add_error_key: true
+      json.message_key: message
 
     output.elasticsearch:
       hosts: ["http://{{ include "enderchest.fullname" . }}-elasticsearch:9200"]
-      index: "enderchest-audit-%{+yyyy.MM.dd}"
+      index: "enderchest-app-%{+yyyy.MM.dd}"
 
     setup.ilm.enabled: false
-    setup.template.name: "enderchest-audit"
-    setup.template.pattern: "enderchest-audit-*"
+    setup.template.name: "enderchest-app"
+    setup.template.pattern: "enderchest-app-*"
 ---
 apiVersion: apps/v1
 kind: DaemonSet
