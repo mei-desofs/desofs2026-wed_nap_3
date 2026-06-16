@@ -1,0 +1,80 @@
+{{- if .Values.elk.enabled }}
+# ═══════════════════════════════════════════════════════════════
+# Elasticsearch — Single-node for school project (SDR-NEW-03)
+# ═══════════════════════════════════════════════════════════════
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "enderchest.fullname" . }}-elasticsearch
+  labels:
+    app: elasticsearch
+    {{- include "enderchest.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: elasticsearch
+  template:
+    metadata:
+      labels:
+        app: elasticsearch
+    spec:
+      containers:
+      - name: elasticsearch
+        image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+        env:
+        - name: discovery.type
+          value: single-node
+        - name: xpack.security.enabled
+          value: "false"
+        - name: ES_JAVA_OPTS
+          value: "-Xms512m -Xmx512m"
+        ports:
+        - containerPort: 9200
+          name: http
+        resources:
+          limits:
+            cpu: "1"
+            memory: 1Gi
+          requests:
+            cpu: 500m
+            memory: 512Mi
+        volumeMounts:
+        - name: es-data
+          mountPath: /usr/share/elasticsearch/data
+      volumes:
+      - name: es-data
+        {{- if .Values.elk.elasticsearch.persistence.enabled }}
+        persistentVolumeClaim:
+          claimName: {{ include "enderchest.fullname" . }}-elasticsearch-pvc
+        {{- else }}
+        emptyDir: {}
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "enderchest.fullname" . }}-elasticsearch
+  labels:
+    {{- include "enderchest.labels" . | nindent 4 }}
+spec:
+  selector:
+    app: elasticsearch
+  ports:
+  - port: 9200
+    targetPort: 9200
+    name: http
+{{- if .Values.elk.elasticsearch.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "enderchest.fullname" . }}-elasticsearch-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.elk.elasticsearch.persistence.size }}
+{{- end }}
+{{- end }}
